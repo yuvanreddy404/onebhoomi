@@ -1851,7 +1851,7 @@ def _clerk_panel(record: dict, message: str) -> str:
       <div class="body">
         {blocked}
         <p class="note"><span data-i18n="lbl_record">Record</span> {html.escape(rec_id)} · <span data-i18n="clerk_instruction_note">read each field against the scan, fix what the OCR got wrong, then save or pass it up to the officer.</span></p>
-        <form action="/extract" method="post" enctype="multipart/form-data">
+        <form action="/extract" method="post" enctype="multipart/form-data" autocomplete="off">
           <input type="hidden" name="verification_id" value="{html.escape(rec_id)}">
           <div class="editor-grid">
             <div class="editor-field">
@@ -1864,11 +1864,11 @@ def _clerk_panel(record: dict, message: str) -> str:
             </div>
             <div class="editor-field">
               <label for="f_survey" data-i18n="f_survey">Survey Number</label>
-              <input type="text" id="f_survey" name="survey_number" value="{html.escape(str(prop.get('survey_number') or ''))}" {readonly_attr}>
+              <input type="text" id="f_survey" name="survey_number" value="{html.escape(str(prop.get('survey_number') or ''))}" {readonly_attr} autocomplete="off">
             </div>
             <div class="editor-field">
               <label for="f_subsurvey" data-i18n="f_subsurvey">Sub-Survey Number</label>
-              <input type="text" id="f_subsurvey" name="sub_survey_number" value="{html.escape(str(prop.get('sub_survey_number') or ''))}" {readonly_attr}>
+              <input type="text" id="f_subsurvey" name="sub_survey_number" value="{html.escape(str(prop.get('sub_survey_number') or ''))}" {readonly_attr} autocomplete="off">
             </div>
             <div class="editor-field">
               <label for="f_area" data-i18n="f_area">Property Area</label>
@@ -2486,8 +2486,26 @@ class LandExtractorHandler(BaseHTTPRequestHandler):
                 get_preview_html(record_id)
                 or f"<p><strong>Active Verification Record:</strong> {record_id}</p>"
             )
+            from semantic_extractor import clean_user_facing_schema
+            payload_data = record.get("document_payload", {})
+            user_facing = clean_user_facing_schema({
+                "document_type": payload_data.get("document_type"),
+                "document_number": payload_data.get("document_number"),
+                "survey_number": payload_data.get("property", {}).get("survey_number"),
+                "sub_survey_number": payload_data.get("property", {}).get("sub_survey_number"),
+                "property_area": payload_data.get("property", {}).get("area"),
+                "village": payload_data.get("property", {}).get("village"),
+                "mandal": payload_data.get("property", {}).get("mandal"),
+                "district": payload_data.get("property", {}).get("district"),
+                "stamp_serial_number": payload_data.get("serial_number") or payload_data.get("stamp_number"),
+                "stamp_value": payload_data.get("stamp_value"),
+                "stamp_sold_to": payload_data.get("stamp_information", {}).get("sold_to"),
+                "parties_list": payload_data.get("parties", []),
+                "document_date": payload_data.get("document_date"),
+                "execution_date": payload_data.get("execution_date"),
+            })
             page = render_page(
-                payload=json.dumps(record, indent=2, ensure_ascii=False),
+                payload=json.dumps(user_facing, indent=2, ensure_ascii=False),
                 message="",
                 preview=preview_html,
                 colab_url_value=get_colab_url(),
@@ -2496,6 +2514,9 @@ class LandExtractorHandler(BaseHTTPRequestHandler):
             )
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
             self.send_header("Content-Length", str(len(page)))
             self.end_headers()
             self.wfile.write(page)
@@ -2730,7 +2751,25 @@ class LandExtractorHandler(BaseHTTPRequestHandler):
                     verification_service.save_record(record)
                     message = "Clerk review corrections saved successfully."
 
-            payload_str = json.dumps(record, indent=2, ensure_ascii=False)
+            from semantic_extractor import clean_user_facing_schema
+            payload_data = record.get("document_payload", {})
+            user_facing = clean_user_facing_schema({
+                "document_type": payload_data.get("document_type"),
+                "document_number": payload_data.get("document_number"),
+                "survey_number": payload_data.get("property", {}).get("survey_number"),
+                "sub_survey_number": payload_data.get("property", {}).get("sub_survey_number"),
+                "property_area": payload_data.get("property", {}).get("area"),
+                "village": payload_data.get("property", {}).get("village"),
+                "mandal": payload_data.get("property", {}).get("mandal"),
+                "district": payload_data.get("property", {}).get("district"),
+                "stamp_serial_number": payload_data.get("serial_number") or payload_data.get("stamp_number"),
+                "stamp_value": payload_data.get("stamp_value"),
+                "stamp_sold_to": payload_data.get("stamp_information", {}).get("sold_to"),
+                "parties_list": payload_data.get("parties", []),
+                "document_date": payload_data.get("document_date"),
+                "execution_date": payload_data.get("execution_date"),
+            })
+            payload_str = json.dumps(user_facing, indent=2, ensure_ascii=False)
             host_name = self.headers.get("Host", f"localhost:{self.server.server_address[1]}")
             preview_html = (
                 get_preview_html(verification_id)
@@ -2749,6 +2788,9 @@ class LandExtractorHandler(BaseHTTPRequestHandler):
             )
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
             self.send_header("Content-Length", str(len(page)))
             self.end_headers()
             self.wfile.write(page)
@@ -2845,6 +2887,43 @@ class LandExtractorHandler(BaseHTTPRequestHandler):
                                         points=[[int(pt[0]), int(pt[1])] for pt in poly],
                                     )
                                 )
+
+                            # Ensure top title boxes on registration plan pages are captured
+                            if page_idx == len(results) or page_idx >= 5:
+                                try:
+                                    import cv2, numpy as np
+                                    p_bytes = page_buffers[page_idx - 1][1]
+                                    arr = np.frombuffer(p_bytes, np.uint8)
+                                    dec = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+                                    if dec is not None:
+                                        h_dec, w_dec = dec.shape[:2]
+                                        y1_b, y2_b = int(h_dec * 0.052), int(h_dec * 0.125)
+                                        banner_crop = dec[y1_b:y2_b, int(w_dec * 0.03):int(w_dec * 0.58)]
+                                        suc, top_enc = cv2.imencode(".jpg", banner_crop, [cv2.IMWRITE_JPEG_QUALITY, 95])
+                                        if suc:
+                                            resp_top = requests.post(
+                                                ocr_url,
+                                                files={"image": ("top.jpg", top_enc.tobytes(), "image/jpeg")},
+                                                timeout=10,
+                                            )
+                                            if resp_top.status_code == 200:
+                                                top_data = resp_top.json()
+                                                for t_text, t_score, t_poly in zip(
+                                                    top_data.get("rec_texts", []),
+                                                    top_data.get("rec_scores", []),
+                                                    top_data.get("rec_polys", []),
+                                                ):
+                                                    t_c = normalize_space(str(t_text))
+                                                    if t_c and not any(t_c.lower() == str(w.text).lower() for w in p_words):
+                                                        p_words.append(
+                                                            OCRWord(
+                                                                text=t_c,
+                                                                score=float(t_score),
+                                                                points=[[int(pt[0]), int(pt[1]) + y1_b] for pt in t_poly],
+                                                            )
+                                                        )
+                                except Exception:
+                                    pass
 
                             p_lines = group_words_into_lines(p_words)
                             for l in p_lines:
@@ -3039,6 +3118,9 @@ class LandExtractorHandler(BaseHTTPRequestHandler):
             )
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
             self.send_header("Content-Length", str(len(page)))
             self.end_headers()
             self.wfile.write(page)

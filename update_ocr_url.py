@@ -37,6 +37,7 @@ WEB_APP_PY = BASE_DIR / "web_app.py"
 PORT = int(os.environ.get("PORT", 8001))
 
 venv_candidates = [
+    Path(r"C:\Users\meesa\Downloads\final land\.venv\Scripts\python.exe"),
     BASE_DIR / ".venv" / "Scripts" / "python.exe",
     BASE_DIR / ".venv" / "bin" / "python3",
     BASE_DIR / ".venv" / "bin" / "python",

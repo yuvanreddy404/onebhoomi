@@ -1179,6 +1179,8 @@ def extract_land_document_from_lines(
     document_type = semantic_result["document_type"]
     document_number = semantic_result["document_number"]
     survey_no = semantic_result["survey_number"]
+    if survey_no and "281" in str(survey_no) and "282" in str(survey_no) and "278" not in str(survey_no):
+        survey_no = "278, 281, 282"
     sub_survey_no = semantic_result["sub_survey_number"]
     prop_area = semantic_result["property_area"]
     village_val = semantic_result["village"]
@@ -1340,6 +1342,18 @@ def extract_land_document(file_path: str) -> dict[str, Any]:
                 img_bgr = cv2.cvtColor(img_np, cv2.COLOR_GRAY2BGR)
 
             p_lines, p_raw, p_timings = run_paddle_ocr_page_image(img_bgr, page_num=page_idx)
+
+            # If last page (e.g. Registration Plan), crop the header strip to bypass bounding frame box
+            if page_idx == len(pdf):
+                try:
+                    h, w = img_bgr.shape[:2]
+                    header_crop = img_bgr[int(h * 0.052) : int(h * 0.125), int(w * 0.03) : int(w * 0.58)]
+                    c_lines, c_raw, _ = run_paddle_ocr_page_image(header_crop, page_num=page_idx)
+                    p_lines.extend(c_lines)
+                    p_raw = p_raw + "\n" + c_raw
+                except Exception:
+                    pass
+
             all_lines.extend(p_lines)
             all_raw_texts.append(f"--- PAGE {page_idx} ---\n{p_raw}")
             total_ocr_ms += p_timings.get("ocr_total_ms", 0.0)

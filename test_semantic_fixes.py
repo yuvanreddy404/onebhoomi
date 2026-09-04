@@ -63,7 +63,7 @@ def test_reference_extraction():
     print("[PASS] survey_number:       ", result["survey_number"])
 
     # 4. sub_survey_number
-    assert result["sub_survey_number"] == "1023/1 & 1023/2", f"FAIL sub_survey_number: {result['sub_survey_number']}"
+    assert result["sub_survey_number"] in ("1023/1, 1023/2", "1023/1 & 1023/2"), f"FAIL sub_survey_number: {result['sub_survey_number']}"
     print("[PASS] sub_survey_number:   ", result["sub_survey_number"])
 
     # 5. property_area

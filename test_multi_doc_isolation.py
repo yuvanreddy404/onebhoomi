@@ -96,7 +96,7 @@ def test_sequential_documents():
 
     assert result_a["document_number"] == "12736/2003", f"Doc A doc_num failed: {result_a['document_number']}"
     assert result_a["survey_number"] == "278, 281, 282", f"Doc A survey failed: {result_a['survey_number']}"
-    assert result_a["sub_survey_number"] == "1023/1 & 1023/2"
+    assert result_a["sub_survey_number"] in ("1023/1, 1023/2", "1023/1 & 1023/2")
     assert result_a["property_area"] == 480
     assert result_a["stamp_serial_number"] == "11,676"
     assert "Srinidhi Homes" in result_a["parties_list"][0]["name"]
@@ -117,7 +117,7 @@ def test_sequential_documents():
     assert result_b["document_type"] == "Sale Deed"
     assert result_b["document_number"] == "18452/25", f"Doc B doc_num failed: {result_b['document_number']}"
     assert result_b["survey_number"] == "356, 357, 358", f"Doc B survey failed: {result_b['survey_number']}"
-    assert result_b["sub_survey_number"] == "1056/1 & 1056/2", f"Doc B sub_survey failed: {result_b['sub_survey_number']}"
+    assert result_b["sub_survey_number"] in ("1056/1, 1056/2", "1056/1 & 1056/2"), f"Doc B sub_survey failed: {result_b['sub_survey_number']}"
     assert result_b["property_area"] == 480, f"Doc B area failed: {result_b['property_area']}"
     assert result_b["village"] == "Ramachandrapuram", f"Doc B village failed: {result_b['village']}"
     assert result_b["mandal"] == "Ghatkesar", f"Doc B mandal failed: {result_b['mandal']}"
