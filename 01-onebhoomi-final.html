@@ -141,7 +141,7 @@
     padding:20px 0;gap:24px;flex-wrap:nowrap;
   }
   .brand{
-    display:flex;align-items:baseline;gap:14px;text-decoration:none;color:var(--ink);
+    display:flex;align-items:center;gap:14px;text-decoration:none;color:var(--ink);
     white-space:nowrap;flex-shrink:0;
   }
   .brand b{
@@ -414,10 +414,11 @@
 
 <header>
   <div class="wrap reg-bar">
-    <a class="brand" href="#top">
-      <b data-i18n="brand_title">OneBhoomi</b>
-      <span data-i18n="brand_sub">offline registry</span>
+    <a class="brand" href="#top" style="display:inline-flex; align-items:center; text-decoration:none;">
+      <img src="/logo.png?v=20260904d" alt="OneBhoomi" style="height:64px; width:auto; display:block; mix-blend-mode:multiply; filter:contrast(1.02);">
     </a>
+
+
     <nav aria-label="Sections">
       <a href="#extraction" data-i18n="nav_extract">Extraction</a>
       <a href="#workflow" data-i18n="nav_workflow">Workflow</a>
@@ -448,7 +449,6 @@
   <!-- HERO -->
   <section class="hero" style="padding-top:96px">
     <div class="wrap">
-      <p class="eyebrow" data-i18n="hero_eyebrow">India Non-Judicial · ₹50 · Telangana</p>
       <h1 data-i18n="hero_h1">The deed becomes <em>data.</em><br>The data stays <em>provable.</em></h1>
       <p class="lede" data-i18n="hero_lede">OneBhoomi reads sale deeds, agreements of sale and GPAs straight off the scanner — offline — turns them into checked, clerk-corrected records, and seals each one with an RSA-PSS signature your office owns.</p>
       <div class="acts">
@@ -480,7 +480,7 @@
     <div class="wrap part-grid">
       <div class="part rv"><b>14</b><span data-i18n="part_fields">canonical fields per deed</span></div>
       <div class="part rv"><b>2048<sup>bit</sup></b><span data-i18n="part_keys">RSA-PSS local keypair</span></div>
-      <div class="part rv"><b>3</b><span data-i18n="part_stages">human review stages</span></div>
+      <div class="part rv"><b>2</b><span data-i18n="part_stages">human review stages</span></div>
       <div class="part rv"><b>0</b><span data-i18n="part_cloud">cloud calls, ever</span></div>
     </div>
   </div>

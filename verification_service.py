@@ -1,11 +1,12 @@
 import base64
+import hashlib
 import json
 import os
 import re
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
@@ -203,7 +204,11 @@ def parse_date(date_str: Any) -> Any:
     return None
 
 
-def run_verification_checks(result: Dict[str, Any]) -> List[Dict[str, Any]]:
+def run_verification_checks(
+    result: Dict[str, Any],
+    file_hash: Optional[str] = None,
+    current_verification_id: Optional[str] = None,
+) -> List[Dict[str, Any]]:
     """
     Executes automated evaluation checks and returns a structured log of passes, warnings, and failures.
     """
@@ -216,6 +221,35 @@ def run_verification_checks(result: Dict[str, Any]) -> List[Dict[str, Any]]:
         payload = result
     else:
         payload = prepare_verification_payload(result)
+
+    # 0. Duplicate Document / Double-Registration Check
+    dup_info = check_duplicate_document(
+        payload=result,
+        file_hash=file_hash,
+        current_verification_id=current_verification_id,
+    )
+    if dup_info:
+        dup_id = dup_info.get("matched_record_id", "")
+        dup_sealed = dup_info.get("sealed_at", "Certified")
+        dup_doc = dup_info.get("document_number", "")
+        doc_txt = f" (Doc No. {dup_doc})" if dup_doc and dup_doc != "N/A" else ""
+        checks.append({
+            "check_id": "duplicate_document_check",
+            "name": "Ledger Duplicate & Double-Registration Check",
+            "status": "FAIL",
+            "severity": "critical",
+            "message": f"DUPLICATE DETECTED: This document{doc_txt} was already registered and cryptographically sealed on {dup_sealed} under Record No. {dup_id[:8].upper()}. Double registration is prohibited under registry rules.",
+            "details": dup_info,
+        })
+    else:
+        checks.append({
+            "check_id": "duplicate_document_check",
+            "name": "Ledger Duplicate & Double-Registration Check",
+            "status": "PASS",
+            "severity": "critical",
+            "message": "Unique document. No prior sealed record found in the registry ledger.",
+            "details": {},
+        })
 
     # 1. Required field validation
     required_missing = []
@@ -474,10 +508,18 @@ def run_verification_checks(result: Dict[str, Any]) -> List[Dict[str, Any]]:
 def calculate_overall_status(checks: List[Dict[str, Any]]) -> str:
     """
     Applies aggregation rules:
+    - If duplicate check is FAIL -> DUPLICATE
     - If any check is FAIL -> FAIL
     - If no FAIL but any check is WARNING -> NEEDS_REVIEW
     - If all checks are PASS -> READY_FOR_APPROVAL
     """
+    is_duplicate = any(
+        check.get("check_id") == "duplicate_document_check" and check.get("status") == "FAIL"
+        for check in checks
+    )
+    if is_duplicate:
+        return "DUPLICATE"
+
     has_fail = any(check.get("status") == "FAIL" for check in checks)
     has_warning = any(check.get("status") == "WARNING" for check in checks)
     
@@ -488,19 +530,22 @@ def calculate_overall_status(checks: List[Dict[str, Any]]) -> str:
     return "READY_FOR_APPROVAL"
 
 
-def create_verification_record(result: Dict[str, Any]) -> Dict[str, Any]:
+def create_verification_record(result: Dict[str, Any], file_hash: Optional[str] = None) -> Dict[str, Any]:
     """
     Assembles the structured in-memory verification registry item.
     """
     payload = prepare_verification_payload(result)
-    checks = run_verification_checks(result)
+    checks = run_verification_checks(result, file_hash=file_hash)
     status = calculate_overall_status(checks)
+    dup_info = check_duplicate_document(payload, file_hash=file_hash)
     
     return {
         "verification_id": str(uuid.uuid4()),
         "status": status,
+        "file_hash": file_hash,
         "document_payload": payload,
         "checks": checks,
+        "duplicate_info": dup_info,
         "created_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "decision": None,
         "signature": None,
@@ -684,4 +729,110 @@ def save_record(record: Dict[str, Any]) -> None:
 
     db[verification_id] = record
     save_db(db)
+
+
+def check_duplicate_document(
+    payload: Optional[Dict[str, Any]] = None,
+    file_hash: Optional[str] = None,
+    current_verification_id: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Checks the local verification database for an already APPROVED/sealed document
+    matching this file hash or canonical document identity.
+    """
+    db = load_db()
+    if not db:
+        return None
+
+    target_hash = (file_hash or "").strip().lower() if file_hash else None
+    
+    target_doc_no = None
+    target_stamp_no = None
+    target_village = None
+    target_district = None
+    target_survey = None
+    
+    if isinstance(payload, dict):
+        doc_data = payload.get("document_payload") if "document_payload" in payload else payload
+        target_doc_no = get_field_value(doc_data, "document_number", "document_no")
+        target_stamp_no = get_field_value(doc_data, "stamp_number", "serial_number", "stamp_serial_number", "stamp_information.stamp_number")
+        target_village = get_field_value(doc_data, "property.village", "village", "property_village")
+        target_district = get_field_value(doc_data, "property.district", "district", "property_district")
+        target_survey = get_field_value(doc_data, "property.survey_number", "survey_number", "property_survey_number")
+
+    def _normalize_id(s: Any) -> str:
+        if not s:
+            return ""
+        return re.sub(r"[^a-zA-Z0-9]", "", str(s)).lower()
+
+    norm_target_doc = _normalize_id(target_doc_no)
+    norm_target_stamp = _normalize_id(target_stamp_no)
+    norm_target_village = _normalize_id(target_village)
+    norm_target_survey = _normalize_id(target_survey)
+
+    ignored = {"", "none", "null", "unknown", "na", "notfound", "nil", "unnumbered"}
+    if norm_target_doc in ignored or len(norm_target_doc) < 3:
+        norm_target_doc = ""
+    if norm_target_stamp in ignored or len(norm_target_stamp) < 4:
+        norm_target_stamp = ""
+
+    for vid, rec in db.items():
+        if not isinstance(rec, dict):
+            continue
+        if current_verification_id and vid == current_verification_id:
+            continue
+        # Only check against officially APPROVED / sealed records
+        if rec.get("status") != "APPROVED":
+            continue
+
+        existing_hash = (rec.get("file_hash") or "").strip().lower()
+        existing_payload = rec.get("document_payload") or {}
+        existing_doc_no = get_field_value(existing_payload, "document_number", "document_no")
+        existing_stamp_no = get_field_value(existing_payload, "stamp_number", "serial_number", "stamp_information.stamp_number")
+        existing_village = get_field_value(existing_payload, "property.village", "village")
+        existing_district = get_field_value(existing_payload, "property.district", "district")
+        existing_survey = get_field_value(existing_payload, "property.survey_number", "survey_number")
+
+        norm_exist_doc = _normalize_id(existing_doc_no)
+        norm_exist_stamp = _normalize_id(existing_stamp_no)
+        norm_exist_village = _normalize_id(existing_village)
+        norm_exist_survey = _normalize_id(existing_survey)
+
+        matched = False
+        match_reason = ""
+
+        # 1. Identical cryptographic file hash
+        if target_hash and existing_hash and target_hash == existing_hash:
+            matched = True
+            match_reason = "Identical cryptographic file hash (exact same document scan uploaded)"
+        
+        # 2. Matching Registered Document Number
+        elif norm_target_doc and norm_exist_doc and norm_target_doc == norm_exist_doc:
+            if (norm_target_village and norm_exist_village and norm_target_village == norm_exist_village) or \
+               (norm_target_survey and norm_exist_survey and norm_target_survey == norm_exist_survey) or \
+               len(norm_target_doc) >= 4:
+                matched = True
+                match_reason = f"Matching registered Document Number ({existing_doc_no})"
+
+        # 3. Matching Stamp Serial Number + Village or Survey
+        elif norm_target_stamp and norm_exist_stamp and norm_target_stamp == norm_exist_stamp:
+            if (norm_target_village and norm_exist_village and norm_target_village == norm_exist_village) or \
+               (norm_target_survey and norm_exist_survey and norm_target_survey == norm_exist_survey) or \
+               len(norm_target_stamp) >= 6:
+                matched = True
+                match_reason = f"Matching Stamp Serial Number ({existing_stamp_no})"
+
+        if matched:
+            return {
+                "is_duplicate": True,
+                "matched_record_id": vid,
+                "matched_status": rec.get("status"),
+                "sealed_at": rec.get("approved_at") or rec.get("created_at") or "Certified",
+                "document_number": existing_doc_no or target_doc_no or "N/A",
+                "survey_number": existing_survey or target_survey or "N/A",
+                "village": existing_village or target_village or "N/A",
+                "match_reason": match_reason,
+            }
+
+    return None
 

@@ -29,6 +29,7 @@ BADGE_LABELS = {
     "READY_FOR_APPROVAL": "Ready for Seal",
     "PASS": "Checks Passed",
     "FAIL": "Checks Failed",
+    "DUPLICATE": "Duplicate Detected",
 }
 
 DASHBOARD_CSS = """
@@ -145,10 +146,10 @@ DASHBOARD_CSS = """
       .app-layout{flex-direction:column}
     }
 
-    .sidebar-top{padding:24px 16px 16px;text-align:left}
+    .sidebar-top{padding:24px 16px 16px;text-align:center}
     .brand-box{
-      display:flex;flex-direction:column;gap:3px;text-decoration:none;color:var(--ink);
-      padding-bottom:18px;border-bottom:2px double var(--rule);margin-bottom:22px;text-align:left;
+      display:flex;align-items:center;justify-content:center;text-decoration:none;color:var(--ink);
+      padding-bottom:18px;border-bottom:2px double var(--rule);margin-bottom:22px;text-align:center;
     }
     .brand-box b{font-family:var(--serif);font-weight:900;font-size:26px;letter-spacing:.04em;line-height:1;text-align:left}
     .brand-box span{font-family:var(--type);font-size:10.5px;letter-spacing:.18em;color:var(--stamp);text-transform:uppercase;text-align:left}
@@ -396,7 +397,7 @@ DASHBOARD_CSS = """
     }
     .b-approved{background:#E6F4EA;color:var(--green);border-color:#A8DAB5}
     .b-extracted,.b-ready_for_approval,.b-under_review{background:#FEF7E0;color:#8A5300;border-color:#F2CD86}
-    .b-rejected,.b-fail{background:#FCE8E6;color:var(--stamp);border-color:#F5B7B1}
+    .b-rejected,.b-fail,.b-duplicate{background:#FCE8E6;color:var(--stamp);border-color:#F5B7B1}
 
     .action-links{display:flex;gap:8px;align-items:center;white-space:nowrap}
     .act-btn{
@@ -1021,10 +1022,11 @@ def _render_sidebar(active_item: str, desk_n: int, sealed_n: int, worker_label: 
     return f"""
   <aside class="dash-sidebar">
     <div class="sidebar-top">
-      <a class="brand-box" href="/" title="Return to Landing Page">
-        <b>OneBhoomi</b>
-        <span data-i18n="dash_sidebar_brand">वनभूमि · REGISTRY DESK</span>
+      <a class="brand-box" href="/" title="Return to Landing Page" style="display:flex; align-items:center; justify-content:center; padding:10px 8px 18px; text-decoration:none; text-align:center;">
+        <img src="/logo.png?v=20260904d" alt="OneBhoomi" style="height:60px; width:auto; display:block; margin:0 auto; mix-blend-mode:multiply; filter:contrast(1.02);">
       </a>
+
+
 
       <div class="nav-label" data-i18n="nav_main_menu">Main Menu</div>
       <ul class="nav-menu">
@@ -1126,7 +1128,10 @@ def render_dashboard(host_name: str = "localhost:8001", colab_url: str = "") -> 
             
             verify_btn = ""
             if r["status"] == "APPROVED":
-                verify_btn = f'<a class="act-btn act-verify" title="View Public Certificate & Offline QR" href="/?verification_id={html.escape(r["id"])}" data-i18n="btn_cert">✓ Certificate</a>'
+                verify_btn = (
+                    f'<a class="act-btn act-verify" title="View Public Certificate & Offline QR" href="/?verification_id={html.escape(r["id"])}" data-i18n="btn_cert">✓ Certificate</a>'
+                    f'<a class="act-btn" title="Export Locked PDF Certificate" href="/export_pdf?verification_id={html.escape(r["id"])}&lock=1" target="_blank" style="margin-left:4px;background:#FCF9F2;border-color:var(--gold,#C9A227);color:var(--stamp,#781D22);font-weight:700;">🔒 PDF</a>'
+                )
 
             body_rows.append(
                 f"""

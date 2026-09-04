@@ -324,15 +324,24 @@ def main():
         is_ready = wait_for_server(timeout=6.0)
 
     print("\n" + "=" * 60)
-    if is_ready:
-        print(" ✅ SUCCESS: Server synced and active with Remote GPU!")
+    if status.get("ok"):
+        gpu_name = status.get("gpu_name", "Remote GPU Engine")
+        print(" ✅ SUCCESS: Connected & Active with Remote GPU!")
+        print(f" • GPU Status:        ONLINE ({gpu_name})")
+        print(f" • Local Web App:     http://localhost:{PORT}")
+        print(f" • Active OCR Tunnel: {ocr_url}")
     else:
-        print(" ⚠️  Server updated, but local port verification timed out.")
-
-    print(f" • Local Web App:     http://localhost:{PORT}")
-    print(f" • Active OCR Tunnel: {ocr_url}")
-    print(f" • Config File:       {COLAB_TXT_PATH}")
+        err_msg = status.get("error", "Unreachable")
+        print(" ❌ OFFLINE WARNING: Kaggle GPU server is NOT RUNNING / UNREACHABLE!")
+        print(f" • GPU Status:        OFFLINE ({err_msg})")
+        print(f" • Stored Tunnel URL: {ocr_url}")
+        print(f" • Local Web App:     http://localhost:{PORT}")
+        print("\n 👉 ACTION REQUIRED:")
+        print("    1. Open your Kaggle GPU Notebook (ocr_colab_benchmark.ipynb).")
+        print("    2. Enable GPU (T4 x2) and Internet ON.")
+        print("    3. Click 'Save Version' -> 'Save & Run All (Commit)'.")
     print("=" * 60 + "\n")
+
     return 0
 
 

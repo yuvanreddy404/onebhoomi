@@ -5,6 +5,7 @@ if os.path.exists(_venv_site) and _venv_site not in sys.path:
     sys.path.insert(0, _venv_site)
 
 import base64
+import hashlib
 import html
 import io
 import json
@@ -33,6 +34,7 @@ from land_document_extractor import (
 import verification_service
 import gis_service
 import dashboard_view
+import certificate_pdf_service
 import socket
 
 def get_lan_ip() -> str:
@@ -437,7 +439,7 @@ HTML_PAGE = Template("""<!doctype html>
 
     header{border-bottom:3px double var(--rule)}
     .reg-bar{display:flex;align-items:center;justify-content:space-between;padding:20px 0;gap:24px;flex-wrap:nowrap}
-    .brand{display:flex;align-items:baseline;gap:14px;text-decoration:none;color:var(--ink);white-space:nowrap;flex-shrink:0}
+    .brand{display:flex;align-items:center;gap:14px;text-decoration:none;color:var(--ink);white-space:nowrap;flex-shrink:0}
     .brand b{font-family:var(--serif);font-weight:900;font-size:26px;letter-spacing:.04em;white-space:nowrap}
     .brand span{font-family:var(--type);font-size:11px;letter-spacing:.14em;color:var(--stamp);text-transform:uppercase;white-space:nowrap;display:inline-block}
     nav{display:flex;gap:28px;align-items:center;white-space:nowrap}
@@ -559,7 +561,7 @@ HTML_PAGE = Template("""<!doctype html>
     .console-head .badge{margin-left:auto}
     .sub{font-family:var(--type);font-size:12px;color:var(--ink-soft);letter-spacing:.1em;margin-top:10px}
     .badge{font-family:var(--type);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;padding:8px 14px;border:1.5px solid;border-radius:2px;white-space:nowrap}
-    .badge.b-fail,.badge.b-rejected{color:var(--paper);background:var(--stamp-deep);border-color:var(--stamp-deep)}
+    .badge.b-fail,.badge.b-rejected,.badge.b-duplicate{color:var(--paper);background:var(--stamp-deep);border-color:var(--stamp-deep)}
     .badge.b-needs_review{color:var(--amber);border-color:var(--amber);background:rgba(169,106,31,.08)}
     .badge.b-extracted{color:var(--ink-soft);border-color:var(--rule);background:rgba(255,255,255,.5)}
     .badge.b-ready_for_approval{color:var(--green);border-color:var(--green);background:rgba(46,107,79,.08)}
@@ -717,6 +719,30 @@ HTML_PAGE = Template("""<!doctype html>
     .qrurl a{color:var(--stamp-deep);text-decoration:underline;word-break:break-all;transition:opacity 0.2s}
     .qrurl a:hover{opacity:0.8;text-decoration:underline}
     .qr-hint{font-size:12px;color:var(--ink-soft);max-width:260px}
+    .pdf-export-box{margin-top:14px;padding:12px 14px;background:var(--paper-deep);border:1px solid var(--rule);box-shadow:3px 3px 0 rgba(34,29,23,.08);max-width:260px;text-align:left;}
+    .pdf-export-title{font-family:var(--type);font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--stamp);display:flex;align-items:center;gap:6px;margin-bottom:4px;}
+    .pdf-export-sub{font-size:11px;color:var(--ink-soft);line-height:1.4;margin-bottom:10px;}
+    .btn-pdf-lock{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;background:var(--stamp);color:var(--paper);font-family:var(--type);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:9px 12px;border:1.5px solid var(--stamp-deep);border-radius:2px;cursor:pointer;box-shadow:2px 2px 0 var(--stamp-deep);text-decoration:none;transition:all 0.15s ease;}
+    .btn-pdf-lock:hover{background:var(--stamp-deep);transform:translateY(-1px);box-shadow:3px 3px 0 var(--ink);color:var(--paper);}
+    .pdf-quick-link{display:block;margin-top:8px;font-family:var(--type);font-size:10.5px;color:var(--ink-soft);text-align:center;text-decoration:underline;transition:color 0.15s;}
+    .pdf-quick-link:hover{color:var(--stamp);}
+    .btn-seal-lock{background:var(--stamp);color:var(--paper);border-color:var(--stamp-deep);box-shadow:3px 3px 0 var(--stamp-deep);cursor:pointer;}
+    .btn-seal-lock:hover{background:var(--stamp-deep);transform:translateY(-1px);box-shadow:4px 4px 0 var(--ink);}
+    .lock-modal-backdrop{position:fixed;inset:0;background:rgba(34,29,23,0.68);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:9999;padding:16px;}
+    .lock-modal-backdrop.active{display:flex;}
+    .lock-modal-card{background:var(--paper);border:2px solid var(--ink);box-shadow:8px 8px 0 var(--ink);max-width:460px;width:100%;padding:24px 26px;position:relative;}
+    .lock-modal-card h3{font-family:var(--serif);font-size:20px;font-weight:700;color:var(--ink);margin:0 0 4px;display:flex;align-items:center;gap:8px;}
+    .lock-modal-card .sub{font-family:var(--type);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--stamp);margin-bottom:14px;}
+    .lock-modal-info{background:var(--paper-deep);border-left:3px solid var(--gold);padding:10px 12px;font-size:12.5px;color:var(--ink-soft);margin-bottom:16px;line-height:1.5;}
+    .lock-input-group{margin-bottom:18px;}
+    .lock-input-group label{display:block;font-family:var(--type);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);font-weight:700;margin-bottom:6px;}
+    .lock-input-wrapper{position:relative;display:flex;align-items:center;}
+    .lock-input-wrapper input{width:100%;font-family:var(--type);font-size:14px;padding:9px 12px;border:1.5px solid var(--ink);background:#fff;color:var(--ink);box-shadow:inset 1px 1px 3px rgba(0,0,0,0.08);}
+    .lock-modal-actions{display:flex;flex-direction:column;gap:10px;}
+    .lock-modal-actions .btn-row{display:flex;gap:10px;}
+    .lock-modal-actions .btn-row .btn{flex:1;text-align:center;cursor:pointer;}
+    .lock-modal-close{position:absolute;right:14px;top:14px;background:none;border:none;font-size:22px;font-weight:700;color:var(--ink-soft);cursor:pointer;line-height:1;}
+    .lock-modal-close:hover{color:var(--stamp);}
     .cert-actions{grid-column:1/-1;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;border-top:1px solid var(--rule);padding-top:22px;margin-top:4px}
 
     /* ---------- rejected ---------- */
@@ -802,10 +828,11 @@ HTML_PAGE = Template("""<!doctype html>
 
 <header>
   <div class="wrap reg-bar">
-    <a class="brand" href="/">
-      <b>OneBhoomi</b>
-      <span>registry console</span>
+    <a class="brand" href="/" style="display:inline-flex; align-items:center; text-decoration:none;">
+      <img src="/logo.png?v=20260904d" alt="OneBhoomi" style="height:64px; width:auto; display:block; mix-blend-mode:multiply; filter:contrast(1.02);">
     </a>
+
+
     <nav aria-label="Sections">
       <a href="/" data-i18n="nav_registry">Registry</a>
       <a href="/dashboard" data-i18n="nav_dashboard">Dashboard</a>
@@ -1390,7 +1417,7 @@ $stage_markup
 </script>
 
 <script>
-const CONSOLE_I18N = {"en": {"nav_registry": "Registry", "nav_dashboard": "Dashboard", "nav_new_scan": "New Scan", "nav_sealing": "Sealing", "nav_verify": "Verify", "console_h1": "Verification <em>Console</em>", "lbl_record": "Record", "badge_extracted": "Extracted", "badge_needs_review": "Needs Review", "badge_ready_for_approval": "Ready for Approval", "badge_approved": "Approved & Sealed", "badge_rejected": "Rejected", "badge_fail": "Checks Failed", "step_scan": "Scan", "step_machine": "Machine Check", "step_clerk": "Clerk Review", "step_seal": "Officer Seal", "lbl_mode": "Mode", "lbl_hardware": "Hardware", "lbl_ocr": "OCR", "lbl_transit": "Transit", "lbl_total": "Total", "lbl_passed": "passed", "lbl_warnings": "warnings", "lbl_failed": "failed", "sched_a_panel_title": "Schedule A · Machine Checklist", "sched_a_sub": "automated", "chk_required_fields_name": "Required Document Fields", "chk_required_fields_msg": "All critical document fields are present.", "chk_area_bounds_name": "Property Area Boundary Validation", "chk_area_bounds_msg": "Property area is valid.", "chk_date_order_name": "Date Parse & Logic Validation", "chk_date_order_msg": "Document and execution dates are logically ordered.", "chk_survey_format_name": "Survey Number Validation", "chk_survey_format_msg": "Survey number format is valid.", "chk_geographic_consistency_name": "Geographic Authority Consistency", "chk_geographic_consistency_msg": "State Authority: VALIDATED via State Registry.", "sched_b_panel_title": "Schedule B · Clerk Review", "sched_b_sub": "correct in place", "clerk_instruction_note": "read each field against the scan, fix what the OCR got wrong, then save or pass it up to the officer.", "f_doc_type": "Document Type", "f_doc_no": "Document Number", "f_survey": "Survey Number", "f_subsurvey": "Sub-Survey Number", "f_area": "Property Area (Sq. Yards)", "f_village": "Village", "f_mandal": "Mandal", "f_district": "District", "f_stamp_no": "Stamp Serial Number", "f_stamp_val": "Stamp Value (₹)", "f_sold_to": "Stamp Sold To", "f_doc_date": "Document Date", "f_exec_date": "Execution Date", "f_parties": "Parties (JSON)", "warn_officer_ok": "Officer approval permanently certifies the reviewed facts and applies the seal.", "btn_save_corrections": "Save Corrections", "btn_officer_approve_seal": "Officer Approve & Seal", "btn_officer_reject": "Officer Reject", "ph_rej_reason": "Rejection reason (required)", "btn_view_cert_qr": "View Standalone Certificate & QR", "footer_title": "OneBhoomi · Offline Registry Console", "footer_sub": "Sale Deeds · Agreements · GPA", "footer_cloud": "No cloud. No keys leaving the office.", "chk_area_validation_name": "Property Area Boundary Validation", "chk_area_validation_msg": "Property area is valid.", "chk_date_validation_name": "Date Parse & Logic Validation", "chk_date_validation_msg": "Document and execution dates are logically ordered.", "chk_survey_number_validation_name": "Survey Number Validation", "chk_survey_number_validation_msg": "Survey number format is valid.", "chk_internal_consistency_name": "Internal Consistency Check", "chk_internal_consistency_msg": "No contradictions found across deed clauses.", "chk_signature_detection_name": "Signature & Stamp Presence", "chk_signature_detection_msg": "Signatures and stamps detected on document scan."}, "hi": {"nav_registry": "रजिस्ट्री", "nav_dashboard": "डैशबोर्ड", "nav_new_scan": "नया स्कैन", "nav_sealing": "डिजिटल मुहर", "nav_verify": "सत्यापन", "console_h1": "सत्यापन <em>कंसोल</em>", "lbl_record": "अभिलेख सं.", "badge_extracted": "निष्कर्षित", "badge_needs_review": "समीक्षा आवश्यक", "badge_ready_for_approval": "मुहर हेतु तैयार", "badge_approved": "अनुमोदित एवं मुहरबंद", "badge_rejected": "अस्वीकृत", "badge_fail": "जांच विफल", "step_scan": "स्कैन", "step_machine": "मशीन चेक", "step_clerk": "क्लर्क समीक्षा", "step_seal": "अधिकारी मुहर", "lbl_mode": "मोड", "lbl_hardware": "हार्डवेयर", "lbl_ocr": "ओसीआर", "lbl_transit": "ट्रांजिट", "lbl_total": "कुल समय", "lbl_passed": "सफल", "lbl_warnings": "चेतावनी", "lbl_failed": "विफल", "sched_a_panel_title": "अनुसूची क · स्वचालित मशीन चेकलिस्ट", "sched_a_sub": "स्वचालित", "chk_required_fields_name": "अनिवार्य दस्तावेज़ फ़ील्ड्स", "chk_required_fields_msg": "सभी महत्वपूर्ण दस्तावेज़ फ़ील्ड्स उपस्थित हैं।", "chk_area_bounds_name": "संपत्ति क्षेत्र सीमा सत्यापन", "chk_area_bounds_msg": "संपत्ति क्षेत्रफल वैध है।", "chk_date_order_name": "तिथि विश्लेषण एवं तार्किक क्रम", "chk_date_order_msg": "दस्तावेज़ एवं निष्पादन तिथियां तार्किक क्रम में हैं।", "chk_survey_format_name": "सर्वेक्षण संख्या सत्यापन", "chk_survey_format_msg": "सर्वेक्षण संख्या प्रारूप कानूनी रूप से मान्य है।", "chk_geographic_consistency_name": "भौगोलिक प्राधिकरण संगतता", "chk_geographic_consistency_msg": "राज्य प्राधिकरण: राज्य रजिस्ट्री द्वारा सत्यापित।", "sched_b_panel_title": "अनुसूची ख · क्लर्क समीक्षा एवं सुधार", "sched_b_sub": "तत्काल सुधारें", "clerk_instruction_note": "स्कैन के आधार पर प्रत्येक फ़ील्ड की जांच करें, ओसीआर त्रुटियों को सुधारें, फिर सहेजें या अनुमोदन हेतु अधिकारी को भेजें।", "f_doc_type": "दस्तावेज़ प्रकार", "f_doc_no": "दस्तावेज़ संख्या", "f_survey": "सर्वेक्षण संख्या", "f_subsurvey": "उप-सर्वेक्षण संख्या", "f_area": "संपत्ति क्षेत्रफल (वर्ग गज)", "f_village": "ग्राम", "f_mandal": "मंडल", "f_district": "ज़िला", "f_stamp_no": "स्टाम्प क्रमांक", "f_stamp_val": "स्टाम्प मूल्य (₹)", "f_sold_to": "स्टाम्प क्रेता", "f_doc_date": "दस्तावेज़ दिनांक", "f_exec_date": "निष्पादन दिनांक", "f_parties": "पक्षकार (JSON)", "warn_officer_ok": "अधिकारी का अनुमोदन तथ्यों को स्थायी रूप से प्रमाणित करता है और डिजिटल मुहर लगाता है।", "btn_save_corrections": "सुधार सहेजें", "btn_officer_approve_seal": "अधिकारी अनुमोदन एवं मुहर", "btn_officer_reject": "अधिकारी अस्वीकृति", "ph_rej_reason": "अस्वीकृति का कारण (अनिवार्य)", "btn_view_cert_qr": "प्रमाणपत्र एवं क्यूआर देखें", "footer_title": "वनभूमि · ऑफ़लाइन रजिस्ट्री कंसोल", "footer_sub": "बिक्री विलेख · अनुबंध · जीपीए", "footer_cloud": "कोई क्लाउड नहीं। कोई भी कुंजी कार्यालय से बाहर नहीं जाती।", "chk_area_validation_name": "संपत्ति क्षेत्र सीमा सत्यापन", "chk_area_validation_msg": "संपत्ति क्षेत्रफल वैध है।", "chk_date_validation_name": "तिथि विश्लेषण एवं तार्किक क्रम", "chk_date_validation_msg": "दस्तावेज़ एवं निष्पादन तिथियां तार्किक क्रम में हैं।", "chk_survey_number_validation_name": "सर्वेक्षण संख्या सत्यापन", "chk_survey_number_validation_msg": "सर्वेक्षण संख्या प्रारूप कानूनी रूप से मान्य है।", "chk_internal_consistency_name": "आंतरिक संगति जांच", "chk_internal_consistency_msg": "विलेख शर्तों में कोई अंतर्विरोध नहीं मिला।", "chk_signature_detection_name": "हस्ताक्षर एवं स्टाम्प उपस्थिति", "chk_signature_detection_msg": "दस्तावेज़ स्कैन पर हस्ताक्षर एवं स्टाम्प की पुष्टि हुई।"}, "te": {"nav_registry": "రిజిస్ట్రీ", "nav_dashboard": "డ్యాష్‌బోర్డ్", "nav_new_scan": "కొత్త స్కాన్", "nav_sealing": "డిజిటల్ ముద్ర", "nav_verify": "ధృవీకరణ", "console_h1": "ధృవీకరణ <em>కన్సోల్</em>", "lbl_record": "రికార్డు సంఖ్య", "badge_extracted": "సేకరించబడింది", "badge_needs_review": "సమీక్ష అవసరం", "badge_ready_for_approval": "ముద్రకు సిద్ధం", "badge_approved": "ఆమోదించబడి & సీల్ చేయబడింది", "badge_rejected": "తిరస్కరించబడింది", "badge_fail": "తనిఖీ విఫలమైంది", "step_scan": "స్కాన్", "step_machine": "మెషిన్ చెక్", "step_clerk": "క్లర్క్ సమీక్ష", "step_seal": "అధికారి ముద్ర", "lbl_mode": "మోడ్", "lbl_hardware": "హార్డ్‌వేర్", "lbl_ocr": "OCR", "lbl_transit": "రవాణా", "lbl_total": "మొత్తం సమయం", "lbl_passed": "విజయవంతం", "lbl_warnings": "హెచ్చరికలు", "lbl_failed": "విఫలమైనవి", "sched_a_panel_title": "షెడ్యూల్ A · ఆటోమేటెడ్ మెషిన్ చెక్‌లిస్ట్", "sched_a_sub": "ఆటోమేటెడ్", "chk_required_fields_name": "అవసరమైన పత్రం ఫీల్డులు", "chk_required_fields_msg": "అన్ని ముఖ్యమైన ఫీల్డులు ఉన్నాయి.", "chk_area_bounds_name": "ఆస్తి విస్తీర్ణం సరిహద్దు తనిఖీ", "chk_area_bounds_msg": "ఆస్తి విస్తీర్ణం చట్టబద్ధంగా ఉంది.", "chk_date_order_name": "తేదీల విశ్లేషణ & తార్కిక క్రమం", "chk_date_order_msg": "దస్తావేజు మరియు అమలు తేదీలు సరైన క్రమంలో ఉన్నాయి.", "chk_survey_format_name": "సర్వే నంబర్ ధృవీకరణ", "chk_survey_format_msg": "సర్వే నంబర్ సరైన ఫార్మాట్‌లో ఉంది.", "chk_geographic_consistency_name": "భౌగోళిక స్థానిక సరిపోలిక", "chk_geographic_consistency_msg": "స్టేట్ అథారిటీ: అధికారిక రిజిస్ట్రీ ద్వారా ధృవీకరించబడింది.", "sched_b_panel_title": "షెడ్యూల్ B · క్లర్క్ సమీక్ష & సవరణ", "sched_b_sub": "ఇక్కడే సవరించండి", "clerk_instruction_note": "స్కాన్ చేసిన పత్రంతో ప్రతి ఫీల్డ్‌ను సరిచూడండి, తప్పులను సరిదిద్దండి, ఆపై భద్రపరచండి లేదా అధికారికి పంపండి.", "f_doc_type": "పత్రం రకం", "f_doc_no": "పత్రం సంఖ్య", "f_survey": "సర్వే నంబర్", "f_subsurvey": "సబ్-సర్వే నంబర్", "f_area": "ఆస్తి విస్తీర్ణం (గజాలు)", "f_village": "గ్రామం", "f_mandal": "మండలం", "f_district": "జిల్లా", "f_stamp_no": "స్టాంప్ సీరియల్ సంఖ్య", "f_stamp_val": "స్టాంప్ విలువ (₹)", "f_sold_to": "స్టాంప్ కొనుగోలుదారు", "f_doc_date": "పత్రం తేదీ", "f_exec_date": "అమలు తేదీ", "f_parties": "పార్టీలు (JSON)", "warn_officer_ok": "అధికారి ఆమోదం రికార్డును శాశ్వతంగా లాక్ చేసి డిజిటల్ సీల్ వేస్తుంది.", "btn_save_corrections": "సవరణలను భద్రపరచండి", "btn_officer_approve_seal": "అధికారి ఆమోదం & ముద్ర", "btn_officer_reject": "అధికారి తిరస్కరణ", "ph_rej_reason": "తిరస్కరణకు కారణం (తప్పనిసరి)", "btn_view_cert_qr": "ధృవీకరణ పత్రం & QR చూడండి", "footer_title": "వన్‌భూమి · ఆఫ్‌లైన్ రిజిస్ట్రీ కన్సోల్", "footer_sub": "సేల్ డీడ్‌లు · ఒప్పందాలు · GPA", "footer_cloud": "క్లౌడ్ లేదు. కార్యాలయం నుండి కీలు ఎక్కడికీ వెళ్లవు.", "chk_area_validation_name": "ఆస్తి విస్తీర్ణం సరిహద్దు తనిఖీ", "chk_area_validation_msg": "ఆస్తి విస్తీర్ణం చట్టబద్ధంగా ఉంది.", "chk_date_validation_name": "తేదీల విశ్లేషణ & తార్కిక క్రమం", "chk_date_validation_msg": "దస్తావేజు మరియు అమలు తేదీలు సరైన క్రమంలో ఉన్నాయి.", "chk_survey_number_validation_name": "సర్వే నంబర్ ధృవీకరణ", "chk_survey_number_validation_msg": "సర్వే నంబర్ సరైన ఫార్మాట్‌లో ఉంది.", "chk_internal_consistency_name": "అంతర్గత స్థిరత్వ తనిఖీ", "chk_internal_consistency_msg": "నిబంధనలలో ఎటువంటి వైరుధ్యాలు కనుగొనబడలేదు.", "chk_signature_detection_name": "సంతకం మరియు స్టాంప్ గుర్తింపు", "chk_signature_detection_msg": "స్కాన్ పత్రంలో సంతకాలు మరియు స్టాంపులు గుర్తించబడ్డాయి."}, "kn": {"nav_registry": "ನೋಂದಣಿ", "nav_dashboard": "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್", "nav_new_scan": "ಹೊಸ ಸ್ಕ್ಯಾನ್", "nav_sealing": "ಡಿಜಿಟಲ್ ಮುದ್ರೆ", "nav_verify": "ಪರಿಶೀಲನೆ", "console_h1": "ಪರಿಶೀಲನಾ <em>ಕನ್ಸೋಲ್</em>", "lbl_record": "ದಾಖಲೆ ಸಂಖ್ಯೆ", "badge_extracted": "ಹೊರತೆಗೆಯಲಾಗಿದೆ", "badge_needs_review": "ಪರಿಶೀಲನೆ ಅಗತ್ಯವಿದೆ", "badge_ready_for_approval": "ಮುದ್ರೆಗೆ ಸಿದ್ಧ", "badge_approved": "ಅನುಮೋದಿಸಿ ಮುದ್ರೆ ಹಾಕಲಾಗಿದೆ", "badge_rejected": "ತಿರಸ್ಕರಿಸಲಾಗಿದೆ", "badge_fail": "ಪರಿಶೀಲನೆ ವಿಫಲ", "step_scan": "ಸ್ಕ್ಯಾನ್", "step_machine": "ಯಂತ್ರ ತಪಾಸಣೆ", "step_clerk": "ಗುಮಾಸ್ತರ ಪರಿಶೀಲನೆ", "step_seal": "ಅಧಿಕಾರಿಯ ಮುದ್ರೆ", "lbl_mode": "ಮೋಡ್", "lbl_hardware": "ಯಂತ್ರಾಂಶ", "lbl_ocr": "OCR", "lbl_transit": "ರವಾನೆ", "lbl_total": "ಒಟ್ಟು ಸಮಯ", "lbl_passed": "ಯಶಸ್ವಿ", "lbl_warnings": "ಎಚ್ಚರಿಕೆಗಳು", "lbl_failed": "ವಿಫಲ", "sched_a_panel_title": "ಹಂತ A · ಸ್ವಯಂಚಾಲಿತ ಯಂತ್ರ ಪರಿಶೀಲನಾಪಟ್ಟಿ", "sched_a_sub": "ಸ್ವಯಂಚಾಲಿತ", "chk_required_fields_name": "ಅಗತ್ಯವಿರುವ ದಾಖಲೆ ಕ್ಷೇತ್ರಗಳು", "chk_required_fields_msg": "ಎಲ್ಲಾ ಪ್ರಮುಖ ಕ್ಷೇತ್ರಗಳು ಲಭ್ಯವಿವೆ.", "chk_area_bounds_name": "ವಿಸ್ತೀರ್ಣ ಮಿತಿ ಪರಿಶೀಲನೆ", "chk_area_bounds_msg": "ಆಸ್ತಿ ವಿಸ್ತೀರ್ಣ ಮಾನ್ಯವಾಗಿದೆ.", "chk_date_order_name": "ದಿನಾಂಕಗಳ ಕ್ರಮಬದ್ಧತೆ ಪರಿಶೀಲನೆ", "chk_date_order_msg": "ದಾಖಲೆ ದಿನಾಂಕಗಳು ಸರಿಯಾದ ಕ್ರಮದಲ್ಲಿವೆ.", "chk_survey_format_name": "ಸರ್ವೇ ಸಂಖ್ಯೆ ಪರಿಶೀಲನೆ", "chk_survey_format_msg": "ಸರ್ವೇ ಸಂಖ್ಯೆ ಮಾದರಿ ಕಾನೂನುಬದ್ಧವಾಗಿದೆ.", "chk_geographic_consistency_name": "ಭೌಗೋಳಿಕ ತಾಳೆ ಪರಿಶೀಲನೆ", "chk_geographic_consistency_msg": "ರಾಜ್ಯ ಪ್ರಾಧಿಕಾರ: ಅಧಿಕೃತ ನೋಂದಣಿಯಿಂದ ದೃಢೀಕರಿಸಲಾಗಿದೆ.", "sched_b_panel_title": "ಹಂತ B · ಸಿಬ್ಬಂದಿ ಪರಿಶೀಲನೆ & ತಿದ್ದುಪಡಿ", "sched_b_sub": "ಇಲ್ಲಿಯೇ ಸರಿಪಡಿಸಿ", "clerk_instruction_note": "ಸ್ಕ್ಯಾನ್ ಮಾಡಿದ ಪ್ರತಿಯೊಂದಿಗೆ ತಾಳೆ ನೋಡಿ, ತಪ್ಪುಗಳನ್ನು ಸರಿಪಡಿಸಿ, ನಂತರ ಉಳಿಸಿ ಅಥವಾ ಅಧಿಕಾರಿಗೆ ಸಲ್ಲಿಸಿ.", "f_doc_type": "ದಾಖಲೆಯ ಪ್ರಕಾರ", "f_doc_no": "ದಾಖಲೆ ಸಂಖ್ಯೆ", "f_survey": "ಸರ್ವೇ ಸಂಖ್ಯೆ", "f_subsurvey": "ಉಪ-ಸರ್ವೇ ಸಂಖ್ಯೆ", "f_area": "ಆಸ್ತಿ ವಿಸ್ತೀರ್ಣ (ಚದರ ಗಜ)", "f_village": "ಗ್ರಾಮ", "f_mandal": "ಹೋಬಳಿ", "f_district": "ಜಿಲ್ಲೆ", "f_stamp_no": "ಮುದ್ರಾಂಕ ಸಂಖ್ಯೆ", "f_stamp_val": "ಮುದ್ರಾಂಕ ಮೌಲ್ಯ (₹)", "f_sold_to": "ಖರೀದಿದಾರರ ಹೆಸರು", "f_doc_date": "ದಾಖಲೆ ದಿನಾಂಕ", "f_exec_date": "ನೋಂದಣಿ ದಿನಾಂಕ", "f_parties": "ಪಕ್ಷಗಾರರ ವಿವರ (JSON)", "warn_officer_ok": "ಅಧಿಕಾರಿಯ ಅನುಮೋದನೆಯು ದಾಖಲೆಯನ್ನು ಅಂತಿಮಗೊಳಿಸಿ ಡಿಜಿಟಲ್ ಮುದ್ರೆ ಹಾಕುತ್ತದೆ.", "btn_save_corrections": "ತಿದ್ದುಪಡಿ ಉಳಿಸಿ", "btn_officer_approve_seal": "ಅಧಿಕಾರಿ ಅನುಮೋದನೆ & ಮುದ್ರೆ", "btn_officer_reject": "ಅಧಿಕಾರಿ ತಿರಸ್ಕಾರ", "ph_rej_reason": "ತಿರಸ್ಕಾರಕ್ಕೆ ಕಾರಣ (ಕಡ್ಡಾಯ)", "btn_view_cert_qr": "ಪ್ರಮಾಣಪತ್ರ & QR ವೀಕ್ಷಿಸಿ", "footer_title": "ವನ್‌ಭೂಮಿ · ಆಫ್‌ಲೈನ್ ನೋಂದಣಿ ಕನ್ಸೋಲ್", "footer_sub": "ಮಾರಾಟ ಪತ್ರಗಳು · ಒಪ್ಪಂದಗಳು · ಜಿಪಿಎ", "footer_cloud": "ಯಾವುದೇ ಕ್ಲೌಡ್ ಇಲ್ಲ. ಕಚೇರಿಯಿಂದ ಕೀಗಳು ಹೊರಹೋಗುವುದಿಲ್ಲ.", "chk_area_validation_name": "ವಿಸ್ತೀರ್ಣ ಮಿತಿ ಪರಿಶೀಲನೆ", "chk_area_validation_msg": "ಆಸ್ತಿ ವಿಸ್ತೀರ್ಣ ಮಾನ್ಯವಾಗಿದೆ.", "chk_date_validation_name": "ದಿನಾಂಕಗಳ ಕ್ರಮಬದ್ಧತೆ ಪರಿಶೀಲನೆ", "chk_date_validation_msg": "ದಾಖಲೆ ದಿನಾಂಕಗಳು ಸರಿಯಾದ ಕ್ರಮದಲ್ಲಿವೆ.", "chk_survey_number_validation_name": "ಸರ್ವೇ ಸಂಖ್ಯೆ ಪರಿಶೀಲನೆ", "chk_survey_number_validation_msg": "ಸರ್ವೇ ಸಂಖ್ಯೆ ಮಾದರಿ ಕಾನೂನುಬದ್ಧವಾಗಿದೆ.", "chk_internal_consistency_name": "ಆಂತರಿಕ ಸುಸಂಗತತೆ ಪರಿಶೀಲನೆ", "chk_internal_consistency_msg": "ಷರತ್ತುಗಳಲ್ಲಿ ಯಾವುದೇ ವಿರೋಧಾಭಾಸಗಳು ಕಂಡುಬಂದಿಲ್ಲ.", "chk_signature_detection_name": "ಸಹಿ ಮತ್ತು ಮುದ್ರಾಂಕ ಪರಿಶೀಲನೆ", "chk_signature_detection_msg": "ಸ್ಕ್ಯಾನ್ ಪ್ರತಿಯಲ್ಲಿ ಸಹಿ ಮತ್ತು ಮುದ್ರಾಂಕಗಳು ದೃಢಪಟ್ಟಿವೆ."}, "ta": {"nav_registry": "பதிவேடு", "nav_dashboard": "டாஷ்போர்டு", "nav_new_scan": "புதிய ஸ்கேன்", "nav_sealing": "டிஜிட்டல் முத்திரை", "nav_verify": "சரிபார்ப்பு", "console_h1": "சரிபார்ப்பு <em>கன்சோல்</em>", "lbl_record": "பதிவு எண்", "badge_extracted": "பிரித்தெடுக்கப்பட்டது", "badge_needs_review": "மதிப்பாய்வு தேவை", "badge_ready_for_approval": "முத்திரைக்கு தயார்", "badge_approved": "ஒப்புதல் அளிக்கப்பட்டு முத்திரையிடப்பட்டது", "badge_rejected": "நிராகரிக்கப்பட்டது", "badge_fail": "சரிபார்ப்பு தோல்வி", "step_scan": "ஸ்கேன்", "step_machine": "இயந்திர சரிபார்ப்பு", "step_clerk": "எழுத்தர் மதிப்பாய்வு", "step_seal": "அதிகாரி முத்திரை", "lbl_mode": "முறைமை", "lbl_hardware": "வன்பொருள்", "lbl_ocr": "OCR", "lbl_transit": "போக்குவரத்து", "lbl_total": "மொத்த நேரம்", "lbl_passed": "வெற்றி", "lbl_warnings": "எச்சரிக்கைகள்", "lbl_failed": "தோல்வி", "sched_a_panel_title": "அட்டவணை A · தானியங்கி இயந்திர சரிபார்ப்பு பட்டியல்", "sched_a_sub": "தானியங்கி", "chk_required_fields_name": "தேவையான ஆவணப் புலங்கள்", "chk_required_fields_msg": "அனைத்து முக்கிய புலங்களும் உள்ளன.", "chk_area_bounds_name": "நிலப் பரப்பளவு எல்லைச் சரிபார்ப்பு", "chk_area_bounds_msg": "பரப்பளவு செல்லுபடியாகும்.", "chk_date_order_name": "தேதி பகுப்பாய்வு & தர்க்கரீதியான வரிசை", "chk_date_order_msg": "ஆவணத் தேதிகள் சரியான வரிசையில் உள்ளன.", "chk_survey_format_name": "சர்வே எண் சரிபார்ப்பு", "chk_survey_format_msg": "சர்வே எண் வடிவம் சட்டப்பூர்வமானது.", "chk_geographic_consistency_name": "இடஞ்சார்ந்த அதிகாரப் பொருத்தம்", "chk_geographic_consistency_msg": "அரசு அதிகாரம்: அதிகாரப்பூர்வ பதிவேடு மூலம் உறுதிப்படுத்தப்பட்டது.", "sched_b_panel_title": "அட்டவணை B · எழுத்தர் மதிப்பாய்வு & திருத்தம்", "sched_b_sub": "இங்கேயே திருத்துக", "clerk_instruction_note": "ஸ்கேன் செய்யப்பட்ட ஆவணத்துடன் ஒப்பிட்டு பிழைகளைத் திருத்துக, பின்னர் சேமிக்கவும் அல்லது அதிகாரிக்கு சமர்ப்பிக்கவும்.", "f_doc_type": "ஆவண வகை", "f_doc_no": "ஆவண எண்", "f_survey": "சர்வே எண்", "f_subsurvey": "உட்பிரிவு சர்வே எண்", "f_area": "சொத்து பரப்பளவு (சதுர கெஜம்)", "f_village": "கிராமம்", "f_mandal": "மண்டலம்", "f_district": "மாவட்டம்", "f_stamp_no": "முத்திரைத்தாள் எண்", "f_stamp_val": "முத்திரை மதிப்பு (₹)", "f_sold_to": "வாங்குபவர் பெயர்", "f_doc_date": "ஆவண தேதி", "f_exec_date": "நிறைவேற்றப்பட்ட தேதி", "f_parties": "நபர்கள் (JSON)", "warn_officer_ok": "அதிகாரியின் ஒப்புதல் ஆவணத்தை உறுதிசெய்து டிஜிட்டல் முத்திரையிடுகிறது.", "btn_save_corrections": "திருத்தங்களை சேமிக்கவும்", "btn_officer_approve_seal": "அதிகாரி ஒப்புதல் & முத்திரை", "btn_officer_reject": "அதிகாரி நிராகரிப்பு", "ph_rej_reason": "நிராகரிப்புக்கான காரணம் (கட்டாயம்)", "btn_view_cert_qr": "சான்றிதழ் & QR பார்க்க", "footer_title": "ஒன்பூமி · ஆஃப்லைன் பதிவேடு கன்சோல்", "footer_sub": "விற்பனைப் பத்திரங்கள் · ஒப்பந்தங்கள் · ஜிபிஏ", "footer_cloud": "கிளவுட் இல்லை. விசைகள் அலுவலகத்தை விட்டு வெளியேறாது.", "chk_area_validation_name": "நிலப் பரப்பளவு எல்லைச் சரிபார்ப்பு", "chk_area_validation_msg": "பரப்பளவு செல்லுபடியாகும்.", "chk_date_validation_name": "தேதி பகுப்பாய்வு & தர்க்கரீதியான வரிசை", "chk_date_validation_msg": "ஆவணத் தேதிகள் சரியான வரிசையில் உள்ளன.", "chk_survey_number_validation_name": "சர்வே எண் சரிபார்ப்பு", "chk_survey_number_validation_msg": "சர்வே எண் வடிவம் சட்டப்பூர்வமானது.", "chk_internal_consistency_name": "உள் நிலைத்தன்மை சரிபார்ப்பு", "chk_internal_consistency_msg": "பத்திரப் பிரிவுகளில் முரண்பாடுகள் எதுவும் இல்லை.", "chk_signature_detection_name": "கையொப்பம் மற்றும் முத்திரை சரிபார்ப்பு", "chk_signature_detection_msg": "ஸ்கேன் செய்யப்பட்ட ஆவணத்தில் கையொப்பங்கள் மற்றும் முத்திரைகள் உறுதிசெய்யப்பட்டன."}};
+const CONSOLE_I18N = {"en": {"nav_registry": "Registry", "nav_dashboard": "Dashboard", "nav_new_scan": "New Scan", "nav_sealing": "Sealing", "nav_verify": "Verify", "console_h1": "Verification <em>Console</em>", "lbl_record": "Record", "badge_extracted": "Extracted", "badge_needs_review": "Needs Review", "badge_ready_for_approval": "Ready for Approval", "badge_approved": "Approved & Sealed", "badge_rejected": "Rejected", "badge_fail": "Checks Failed", "badge_duplicate": "Duplicate Detected", "step_scan": "Scan", "step_machine": "Machine Check", "step_clerk": "Clerk Review", "step_seal": "Officer Seal", "lbl_mode": "Mode", "lbl_hardware": "Hardware", "lbl_ocr": "OCR", "lbl_transit": "Transit", "lbl_total": "Total", "lbl_passed": "passed", "lbl_warnings": "warnings", "lbl_failed": "failed", "sched_a_panel_title": "Schedule A · Machine Checklist", "sched_a_sub": "automated", "chk_duplicate_document_check_name": "Ledger Duplicate Check", "chk_duplicate_document_check_msg": "Duplicate check against sealed records.", "chk_required_fields_name": "Required Document Fields", "chk_required_fields_msg": "All critical document fields are present.", "chk_area_bounds_name": "Property Area Boundary Validation", "chk_area_bounds_msg": "Property area is valid.", "chk_date_order_name": "Date Parse & Logic Validation", "chk_date_order_msg": "Document and execution dates are logically ordered.", "chk_survey_format_name": "Survey Number Validation", "chk_survey_format_msg": "Survey number format is valid.", "chk_geographic_consistency_name": "Geographic Authority Consistency", "chk_geographic_consistency_msg": "State Authority: VALIDATED via State Registry.", "sched_b_panel_title": "Schedule B · Clerk Review", "sched_b_sub": "correct in place", "clerk_instruction_note": "read each field against the scan, fix what the OCR got wrong, then save or pass it up to the officer.", "f_doc_type": "Document Type", "f_doc_no": "Document Number", "f_survey": "Survey Number", "f_subsurvey": "Sub-Survey Number", "f_area": "Property Area (Sq. Yards)", "f_village": "Village", "f_mandal": "Mandal", "f_district": "District", "f_stamp_no": "Stamp Serial Number", "f_stamp_val": "Stamp Value (₹)", "f_sold_to": "Stamp Sold To", "f_doc_date": "Document Date", "f_exec_date": "Execution Date", "f_parties": "Parties (JSON)", "warn_officer_ok": "Officer approval permanently certifies the reviewed facts and applies the seal.", "btn_save_corrections": "Save Corrections", "btn_officer_approve_seal": "Officer Approve & Seal", "btn_officer_reject": "Officer Reject", "ph_rej_reason": "Rejection reason (required)", "btn_view_cert_qr": "View Standalone Certificate & QR", "footer_title": "OneBhoomi · Offline Registry Console", "footer_sub": "Sale Deeds · Agreements · GPA", "footer_cloud": "No cloud. No keys leaving the office.", "chk_area_validation_name": "Property Area Boundary Validation", "chk_area_validation_msg": "Property area is valid.", "chk_date_validation_name": "Date Parse & Logic Validation", "chk_date_validation_msg": "Document and execution dates are logically ordered.", "chk_survey_number_validation_name": "Survey Number Validation", "chk_survey_number_validation_msg": "Survey number format is valid.", "chk_internal_consistency_name": "Internal Consistency Check", "chk_internal_consistency_msg": "No contradictions found across deed clauses.", "chk_signature_detection_name": "Signature & Stamp Presence", "chk_signature_detection_msg": "Signatures and stamps detected on document scan."}, "hi": {"nav_registry": "रजिस्ट्री", "nav_dashboard": "डैशबोर्ड", "nav_new_scan": "नया स्कैन", "nav_sealing": "डिजिटल मुहर", "nav_verify": "सत्यापन", "console_h1": "सत्यापन <em>कंसोल</em>", "lbl_record": "अभिलेख सं.", "badge_extracted": "निष्कर्षित", "badge_needs_review": "समीक्षा आवश्यक", "badge_ready_for_approval": "मुहर हेतु तैयार", "badge_approved": "अनुमोदित एवं मुहरबंद", "badge_rejected": "अस्वीकृत", "badge_fail": "जांच विफल", "badge_duplicate": "डुप्लिकेट दस्तावेज़", "step_scan": "स्कैन", "step_machine": "मशीन चेक", "step_clerk": "क्लर्क समीक्षा", "step_seal": "अधिकारी मुहर", "lbl_mode": "मोड", "lbl_hardware": "हार्डवेयर", "lbl_ocr": "ओसीआर", "lbl_transit": "ट्रांजिट", "lbl_total": "कुल समय", "lbl_passed": "सफल", "lbl_warnings": "चेतावनी", "lbl_failed": "विफल", "sched_a_panel_title": "अनुसूची क · स्वचालित मशीन चेकलिस्ट", "sched_a_sub": "स्वचालित", "chk_duplicate_document_check_name": "लेज़र डुप्लिकेट जांच", "chk_duplicate_document_check_msg": "सील किए गए रिकॉर्ड के विरुद्ध डुप्लिकेट जांच।", "chk_required_fields_name": "अनिवार्य दस्तावेज़ फ़ील्ड्स", "chk_required_fields_msg": "सभी महत्वपूर्ण दस्तावेज़ फ़ील्ड्स उपस्थित हैं।", "chk_area_bounds_name": "संपत्ति क्षेत्र सीमा सत्यापन", "chk_area_bounds_msg": "संपत्ति क्षेत्रफल वैध है।", "chk_date_order_name": "तिथि विश्लेषण एवं तार्किक क्रम", "chk_date_order_msg": "दस्तावेज़ एवं निष्पादन तिथियां तार्किक क्रम में हैं।", "chk_survey_format_name": "सर्वेक्षण संख्या सत्यापन", "chk_survey_format_msg": "सर्वेक्षण संख्या प्रारूप कानूनी रूप से मान्य है।", "chk_geographic_consistency_name": "भौगोलिक प्राधिकरण संगतता", "chk_geographic_consistency_msg": "राज्य प्राधिकरण: राज्य रजिस्ट्री द्वारा सत्यापित।", "sched_b_panel_title": "अनुसूची ख · क्लर्क समीक्षा एवं सुधार", "sched_b_sub": "तत्काल सुधारें", "clerk_instruction_note": "स्कैन के आधार पर प्रत्येक फ़ील्ड की जांच करें, ओसीआर त्रुटियों को सुधारें, फिर सहेजें या अनुमोदन हेतु अधिकारी को भेजें।", "f_doc_type": "दस्तावेज़ प्रकार", "f_doc_no": "दस्तावेज़ संख्या", "f_survey": "सर्वेक्षण संख्या", "f_subsurvey": "उप-सर्वेक्षण संख्या", "f_area": "संपत्ति क्षेत्रफल (वर्ग गज)", "f_village": "ग्राम", "f_mandal": "मंडल", "f_district": "ज़िला", "f_stamp_no": "स्टाम्प क्रमांक", "f_stamp_val": "स्टाम्प मूल्य (₹)", "f_sold_to": "स्टाम्प क्रेता", "f_doc_date": "दस्तावेज़ दिनांक", "f_exec_date": "निष्पादन दिनांक", "f_parties": "पक्षकार (JSON)", "warn_officer_ok": "अधिकारी का अनुमोदन तथ्यों को स्थायी रूप से प्रमाणित करता है और डिजिटल मुहर लगाता है।", "btn_save_corrections": "सुधार सहेजें", "btn_officer_approve_seal": "अधिकारी अनुमोदन एवं मुहर", "btn_officer_reject": "अधिकारी अस्वीकृति", "ph_rej_reason": "अस्वीकृति का कारण (अनिवार्य)", "btn_view_cert_qr": "प्रमाणपत्र एवं क्यूआर देखें", "footer_title": "वनभूमि · ऑफ़लाइन रजिस्ट्री कंसोल", "footer_sub": "बिक्री विलेख · अनुबंध · जीपीए", "footer_cloud": "कोई क्लाउड नहीं। कोई भी कुंजी कार्यालय से बाहर नहीं जाती।", "chk_area_validation_name": "संपत्ति क्षेत्र सीमा सत्यापन", "chk_area_validation_msg": "संपत्ति क्षेत्रफल वैध है।", "chk_date_validation_name": "तिथि विश्लेषण एवं तार्किक क्रम", "chk_date_validation_msg": "दस्तावेज़ एवं निष्पादन तिथियां तार्किक क्रम में हैं।", "chk_survey_number_validation_name": "सर्वेक्षण संख्या सत्यापन", "chk_survey_number_validation_msg": "सर्वेक्षण संख्या प्रारूप कानूनी रूप से मान्य है।", "chk_internal_consistency_name": "आंतरिक संगति जांच", "chk_internal_consistency_msg": "विलेख शर्तों में कोई अंतर्विरोध नहीं मिला।", "chk_signature_detection_name": "हस्ताक्षर एवं स्टाम्प उपस्थिति", "chk_signature_detection_msg": "दस्तावेज़ स्कैन पर हस्ताक्षर एवं स्टाम्प की पुष्टि हुई।"}, "te": {"nav_registry": "రిజిస్ట్రీ", "nav_dashboard": "డ్యాష్‌బోర్డ్", "nav_new_scan": "కొత్త స్కాన్", "nav_sealing": "డిజిటల్ ముద్ర", "nav_verify": "ధృవీకరణ", "console_h1": "ధృవీకరణ <em>కన్సోల్</em>", "lbl_record": "రికార్డు సంఖ్య", "badge_extracted": "సేకరించబడింది", "badge_needs_review": "సమీక్ష అవసరం", "badge_ready_for_approval": "ముద్రకు సిద్ధం", "badge_approved": "ఆమోదించబడి & సీల్ చేయబడింది", "badge_rejected": "తిరస్కరించబడింది", "badge_fail": "తనిఖీ విఫలమైంది", "badge_duplicate": "డూప్లికేట్ పత్రం", "step_scan": "స్కాన్", "step_machine": "మెషిన్ చెక్", "step_clerk": "క్లర్క్ సమీక్ష", "step_seal": "అధికారి ముద్ర", "lbl_mode": "మోడ్", "lbl_hardware": "హార్డ్‌వేర్", "lbl_ocr": "OCR", "lbl_transit": "రవాణా", "lbl_total": "మొత్తం సమయం", "lbl_passed": "విజయవంతం", "lbl_warnings": "హెచ్చరికలు", "lbl_failed": "విఫలమైనవి", "sched_a_panel_title": "షెడ్యూల్ A · ఆటోమేటెడ్ మెషిన్ చెక్‌లిస్ట్", "sched_a_sub": "ఆటోమేటెడ్", "chk_duplicate_document_check_name": "రిజిస్ట్రీ డూప్లికేట్ తనిఖీ", "chk_duplicate_document_check_msg": "సీల్ చేయబడిన రికార్డులతో డూప్లికేట్ తనిఖీ.", "chk_required_fields_name": "అవసరమైన పత్రం ఫీల్డులు", "chk_required_fields_msg": "అన్ని ముఖ్యమైన ఫీల్డులు ఉన్నాయి.", "chk_area_bounds_name": "ఆస్తి విస్తీర్ణం సరిహద్దు తనిఖీ", "chk_area_bounds_msg": "ఆస్తి విస్తీర్ణం చట్టబద్ధంగా ఉంది.", "chk_date_order_name": "తేదీల విశ్లేషణ & తార్కిక క్రమం", "chk_date_order_msg": "దస్తావేజు మరియు అమలు తేదీలు సరైన క్రమంలో ఉన్నాయి.", "chk_survey_format_name": "సర్వే నంబర్ ధృవీకరణ", "chk_survey_format_msg": "సర్వే నంబర్ సరైన ఫార్మాట్‌లో ఉంది.", "chk_geographic_consistency_name": "భౌగోళిక స్థానిక సరిపోలిక", "chk_geographic_consistency_msg": "స్టేట్ అథారిటీ: అధికారిక రిజిస్ట్రీ ద్వారా ధృవీకరించబడింది.", "sched_b_panel_title": "షెడ్యూల్ B · క్లర్క్ సమీక్ష & సవరణ", "sched_b_sub": "ఇక్కడే సవరించండి", "clerk_instruction_note": "స్కాన్ చేసిన పత్రంతో ప్రతి ఫీల్డ్‌ను సరిచూడండి, తప్పులను సరిదిద్దండి, ఆపై భద్రపరచండి లేదా అధికారికి పంపండి.", "f_doc_type": "పత్రం రకం", "f_doc_no": "పత్రం సంఖ్య", "f_survey": "సర్వే నంబర్", "f_subsurvey": "సబ్-సర్వే నంబర్", "f_area": "ఆస్తి విస్తీర్ణం (గజాలు)", "f_village": "గ్రామం", "f_mandal": "మండలం", "f_district": "జిల్లా", "f_stamp_no": "స్టాంప్ సీరియల్ సంఖ్య", "f_stamp_val": "స్టాంప్ విలువ (₹)", "f_sold_to": "స్టాంప్ కొనుగోలుదారు", "f_doc_date": "పత్రం తేదీ", "f_exec_date": "అమలు తేదీ", "f_parties": "పార్టీలు (JSON)", "warn_officer_ok": "అధికారి ఆమోదం రికార్డును శాశ్వతంగా లాక్ చేసి డిజిటల్ సీల్ వేస్తుంది.", "btn_save_corrections": "సవరణలను భద్రపరచండి", "btn_officer_approve_seal": "అధికారి ఆమోదం & ముద్ర", "btn_officer_reject": "అధికారి తిరస్కరణ", "ph_rej_reason": "తిరస్కరణకు కారణం (తప్పనిసరి)", "btn_view_cert_qr": "ధృవీకరణ పత్రం & QR చూడండి", "footer_title": "వన్‌భూమి · ఆఫ్‌లైన్ రిజిస్ట్రీ కన్సోల్", "footer_sub": "సేల్ డీడ్‌లు · ఒప్పందాలు · GPA", "footer_cloud": "క్లౌడ్ లేదు. కార్యాలయం నుండి కీలు ఎక్కడికీ వెళ్లవు.", "chk_area_validation_name": "ఆస్తి విస్తీర్ణం సరిహద్దు తనిఖీ", "chk_area_validation_msg": "ఆస్తి విస్తీర్ణం చట్టబద్ధంగా ఉంది.", "chk_date_validation_name": "తేదీల విశ్లేషణ & తార్కిక క్రమం", "chk_date_validation_msg": "దస్తావేజు మరియు అమలు తేదీలు సరైన క్రమంలో ఉన్నాయి.", "chk_survey_number_validation_name": "సర్వే నంబర్ ధృవీకరణ", "chk_survey_number_validation_msg": "సర్వే నంబర్ సరైన ఫార్మాట్‌లో ఉంది.", "chk_internal_consistency_name": "అంతర్గత స్థిరత్వ తనిఖీ", "chk_internal_consistency_msg": "నిబంధనలలో ఎటువంటి వైరుధ్యాలు కనుగొనబడలేదు.", "chk_signature_detection_name": "సంతకం మరియు స్టాంప్ గుర్తింపు", "chk_signature_detection_msg": "స్కాన్ పత్రంలో సంతకాలు మరియు స్టాంపులు గుర్తించబడ్డాయి."}, "kn": {"nav_registry": "ನೋಂದಣಿ", "nav_dashboard": "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್", "nav_new_scan": "ಹೊಸ ಸ್ಕ್ಯಾನ್", "nav_sealing": "ಡಿಜಿಟಲ್ ಮುದ್ರೆ", "nav_verify": "ಪರಿಶೀಲನೆ", "console_h1": "ಪರಿಶೀಲನಾ <em>ಕನ್ಸೋಲ್</em>", "lbl_record": "ದಾಖಲೆ ಸಂಖ್ಯೆ", "badge_extracted": "ಹೊರತೆಗೆಯಲಾಗಿದೆ", "badge_needs_review": "ಪರಿಶೀಲನೆ ಅಗತ್ಯವಿದೆ", "badge_ready_for_approval": "ಮುದ್ರೆಗೆ ಸಿದ್ಧ", "badge_approved": "ಅನುಮೋದಿಸಿ ಮುದ್ರೆ ಹಾಕಲಾಗಿದೆ", "badge_rejected": "ತಿರಸ್ಕರಿಸಲಾಗಿದೆ", "badge_fail": "ಪರಿಶೀಲನೆ ವಿಫಲ", "badge_duplicate": "ನಕಲಿ ದಾಖಲೆ", "step_scan": "ಸ್ಕ್ಯಾನ್", "step_machine": "ಯಂತ್ರ ತಪಾಸಣೆ", "step_clerk": "ಗುಮಾಸ್ತರ ಪರಿಶೀಲನೆ", "step_seal": "ಅಧಿಕಾರಿಯ ಮುದ್ರೆ", "lbl_mode": "ಮೋಡ್", "lbl_hardware": "ಯಂತ್ರಾಂಶ", "lbl_ocr": "OCR", "lbl_transit": "ರವಾನೆ", "lbl_total": "ಒಟ್ಟು ಸಮಯ", "lbl_passed": "ಯಶಸ್ವಿ", "lbl_warnings": "ಎಚ್ಚರಿಕೆಗಳು", "lbl_failed": "ವಿಫಲ", "sched_a_panel_title": "ಹಂತ A · ಸ್ವಯಂಚಾಲಿತ ಯಂತ್ರ ಪರಿಶೀಲನಾಪಟ್ಟಿ", "sched_a_sub": "ಸ್ವಯಂಚಾಲಿತ", "chk_duplicate_document_check_name": "ನೋಂದಣಿ ನಕಲು ಪರಿಶೀಲನೆ", "chk_duplicate_document_check_msg": "ಮುದ್ರಿತ ದಾಖಲೆಗಳೊಂದಿಗೆ ನಕಲು ಪರಿಶೀಲನೆ.", "chk_required_fields_name": "ಅಗತ್ಯವಿರುವ ದಾಖಲೆ ಕ್ಷೇತ್ರಗಳು", "chk_required_fields_msg": "ಎಲ್ಲಾ ಪ್ರಮುಖ ಕ್ಷೇತ್ರಗಳು ಲಭ್ಯವಿವೆ.", "chk_area_bounds_name": "ವಿಸ್ತೀರ್ಣ ಮಿತಿ ಪರಿಶೀಲನೆ", "chk_area_bounds_msg": "ಆಸ್ತಿ ವಿಸ್ತೀರ್ಣ ಮಾನ್ಯವಾಗಿದೆ.", "chk_date_order_name": "ದಿನಾಂಕಗಳ ಕ್ರಮಬದ್ಧತೆ ಪರಿಶೀಲನೆ", "chk_date_order_msg": "ದಾಖಲೆ ದಿನಾಂಕಗಳು ಸರಿಯಾದ ಕ್ರಮದಲ್ಲಿವೆ.", "chk_survey_format_name": "ಸರ್ವೇ ಸಂಖ್ಯೆ ಪರಿಶೀಲನೆ", "chk_survey_format_msg": "ಸರ್ವೇ ಸಂಖ್ಯೆ ಮಾದರಿ ಕಾನೂನುಬದ್ಧವಾಗಿದೆ.", "chk_geographic_consistency_name": "ಭೌಗೋಳಿಕ ತಾಳೆ ಪರಿಶೀಲನೆ", "chk_geographic_consistency_msg": "ರಾಜ್ಯ ಪ್ರಾಧಿಕಾರ: ಅಧಿಕೃತ ನೋಂದಣಿಯಿಂದ ದೃಢೀಕರಿಸಲಾಗಿದೆ.", "sched_b_panel_title": "ಹಂತ B · ಸಿಬ್ಬಂದಿ ಪರಿಶೀಲನೆ & ತಿದ್ದುಪಡಿ", "sched_b_sub": "ಇಲ್ಲಿಯೇ ಸರಿಪಡಿಸಿ", "clerk_instruction_note": "ಸ್ಕ್ಯಾನ್ ಮಾಡಿದ ಪ್ರತಿಯೊಂದಿಗೆ ತಾಳೆ ನೋಡಿ, ತಪ್ಪುಗಳನ್ನು ಸರಿಪಡಿಸಿ, ನಂತರ ಉಳಿಸಿ ಅಥವಾ ಅಧಿಕಾರಿಗೆ ಸಲ್ಲಿಸಿ.", "f_doc_type": "ದಾಖಲೆಯ ಪ್ರಕಾರ", "f_doc_no": "ದಾಖಲೆ ಸಂಖ್ಯೆ", "f_survey": "ಸರ್ವೇ ಸಂಖ್ಯೆ", "f_subsurvey": "ಉಪ-ಸರ್ವೇ ಸಂಖ್ಯೆ", "f_area": "ಆಸ್ತಿ ವಿಸ್ತೀರ್ಣ (ಚದರ ಗಜ)", "f_village": "ಗ್ರಾಮ", "f_mandal": "ಹೋಬಳಿ", "f_district": "ಜಿಲ್ಲೆ", "f_stamp_no": "ಮುದ್ರಾಂಕ ಸಂಖ್ಯೆ", "f_stamp_val": "ಮುದ್ರಾಂಕ ಮೌಲ್ಯ (₹)", "f_sold_to": "ಖರೀದಿದಾರರ ಹೆಸರು", "f_doc_date": "ದಾಖಲೆ ದಿನಾಂಕ", "f_exec_date": "ನೋಂದಣಿ ದಿನಾಂಕ", "f_parties": "ಪಕ್ಷಗಾರರ ವಿವರ (JSON)", "warn_officer_ok": "ಅಧಿಕಾರಿಯ ಅನುಮೋದನೆಯು ದಾಖಲೆಯನ್ನು ಅಂತಿಮಗೊಳಿಸಿ ಡಿಜಿಟಲ್ ಮುದ್ರೆ ಹಾಕುತ್ತದೆ.", "btn_save_corrections": "ತಿದ್ದುಪಡಿ ಉಳಿಸಿ", "btn_officer_approve_seal": "ಅಧಿಕಾರಿ ಅನುಮೋದನೆ & ಮುದ್ರೆ", "btn_officer_reject": "ಅಧಿಕಾರಿ ತಿರಸ್ಕಾರ", "ph_rej_reason": "ತಿರಸ್ಕಾರಕ್ಕೆ ಕಾರಣ (ಕಡ್ಡಾಯ)", "btn_view_cert_qr": "ಪ್ರಮಾಣಪತ್ರ & QR ವೀಕ್ಷಿಸಿ", "footer_title": "ವನ್‌ಭೂಮಿ · ಆಫ್‌ಲೈನ್ ನೋಂದಣಿ ಕನ್ಸೋಲ್", "footer_sub": "ಮಾರಾಟ ಪತ್ರಗಳು · ಒಪ್ಪಂದಗಳು · ಜಿಪಿಎ", "footer_cloud": "ಯಾವುದೇ ಕ್ಲೌಡ್ ಇಲ್ಲ. ಕಚೇರಿಯಿಂದ ಕೀಗಳು ಹೊರಹೋಗುವುದಿಲ್ಲ.", "chk_area_validation_name": "ವಿಸ್ತೀರ್ಣ ಮಿತಿ ಪರಿಶೀಲನೆ", "chk_area_validation_msg": "ಆಸ್ತಿ ವಿಸ್ತೀರ್ಣ ಮಾನ್ಯವಾಗಿದೆ.", "chk_date_validation_name": "ದಿನಾಂಕಗಳ ಕ್ರಮಬದ್ಧತೆ ಪರಿಶೀಲನೆ", "chk_date_validation_msg": "ದಾಖಲೆ ದಿನಾಂಕಗಳು ಸರಿಯಾದ ಕ್ರಮದಲ್ಲಿವೆ.", "chk_survey_number_validation_name": "ಸರ್ವೇ ಸಂಖ್ಯೆ ಪರಿಶೀಲನೆ", "chk_survey_number_validation_msg": "ಸರ್ವೇ ಸಂಖ್ಯೆ ಮಾದರಿ ಕಾನೂನುಬದ್ಧವಾಗಿದೆ.", "chk_internal_consistency_name": "ಆಂತರಿಕ ಸುಸಂಗತತೆ ಪರಿಶೀಲನೆ", "chk_internal_consistency_msg": "ಷರತ್ತುಗಳಲ್ಲಿ ಯಾವುದೇ ವಿರೋಧಾಭಾಸಗಳು ಕಂಡುಬಂದಿಲ್ಲ.", "chk_signature_detection_name": "ಸಹಿ ಮತ್ತು ಮುದ್ರಾಂಕ ಪರಿಶೀಲನೆ", "chk_signature_detection_msg": "ಸ್ಕ್ಯಾನ್ ಪ್ರತಿಯಲ್ಲಿ ಸಹಿ ಮತ್ತು ಮುದ್ರಾಂಕಗಳು ದೃಢಪಟ್ಟಿವೆ."}, "ta": {"nav_registry": "பதிவேடு", "nav_dashboard": "டாஷ்போர்டு", "nav_new_scan": "புதிய ஸ்கேன்", "nav_sealing": "டிஜிட்டல் முத்திரை", "nav_verify": "சரிபார்ப்பு", "console_h1": "சரிபார்ப்பு <em>கன்சோல்</em>", "lbl_record": "பதிவு எண்", "badge_extracted": "பிரித்தெடுக்கப்பட்டது", "badge_needs_review": "மதிப்பாய்வு தேவை", "badge_ready_for_approval": "முத்திரைக்கு தயார்", "badge_approved": "ஒப்புதல் அளிக்கப்பட்டு முத்திரையிடப்பட்டது", "badge_rejected": "நிராகரிக்கப்பட்டது", "badge_fail": "சரிபார்ப்பு தோல்வி", "badge_duplicate": "நகல் ஆவணம்", "step_scan": "ஸ்கேன்", "step_machine": "இயந்திர சரிபார்ப்பு", "step_clerk": "எழுத்தர் மதிப்பாய்வு", "step_seal": "அதிகாரி முத்திரை", "lbl_mode": "முறைமை", "lbl_hardware": "வன்பொருள்", "lbl_ocr": "OCR", "lbl_transit": "போக்குவரத்து", "lbl_total": "மொத்த நேரம்", "lbl_passed": "வெற்றி", "lbl_warnings": "எச்சரிக்கைகள்", "lbl_failed": "தோல்வி", "sched_a_panel_title": "அட்டவணை A · தானியங்கி இயந்திர சரிபார்ப்பு பட்டியல்", "sched_a_sub": "தானியங்கி", "chk_duplicate_document_check_name": "பதிவேடு நகல் சரிபார்ப்பு", "chk_duplicate_document_check_msg": "முத்திரையிடப்பட்ட பதிவேட்டுடன் நகல் சரிபார்ப்பு.", "chk_required_fields_name": "தேவையான ஆவணப் புலங்கள்", "chk_required_fields_msg": "அனைத்து முக்கிய புலங்களும் உள்ளன.", "chk_area_bounds_name": "நிலப் பரப்பளவு எல்லைச் சரிபார்ப்பு", "chk_area_bounds_msg": "பரப்பளவு செல்லுபடியாகும்.", "chk_date_order_name": "தேதி பகுப்பாய்வு & தர்க்கரீதியான வரிசை", "chk_date_order_msg": "ஆவணத் தேதிகள் சரியான வரிசையில் உள்ளன.", "chk_survey_format_name": "சர்வே எண் சரிபார்ப்பு", "chk_survey_format_msg": "சர்வே எண் வடிவம் சட்டப்பூர்வமானது.", "chk_geographic_consistency_name": "இடஞ்சார்ந்த அதிகாரப் பொருத்தம்", "chk_geographic_consistency_msg": "அரசு அதிகாரம்: அதிகாரப்பூர்வ பதிவேடு மூலம் உறுதிப்படுத்தப்பட்டது.", "sched_b_panel_title": "அட்டவணை B · எழுத்தர் மதிப்பாய்வு & திருத்தம்", "sched_b_sub": "இங்கேயே திருத்துக", "clerk_instruction_note": "ஸ்கேன் செய்யப்பட்ட ஆவணத்துடன் ஒப்பிட்டு பிழைகளைத் திருத்துக, பின்னர் சேமிக்கவும் அல்லது அதிகாரிக்கு சமர்ப்பிக்கவும்.", "f_doc_type": "ஆவண வகை", "f_doc_no": "ஆவண எண்", "f_survey": "சர்வே எண்", "f_subsurvey": "உட்பிரிவு சர்வே எண்", "f_area": "சொத்து பரப்பளவு (சதுர கெஜம்)", "f_village": "கிராமம்", "f_mandal": "மண்டலம்", "f_district": "மாவட்டம்", "f_stamp_no": "முத்திரைத்தாள் எண்", "f_stamp_val": "முத்திரை மதிப்பு (₹)", "f_sold_to": "வாங்குபவர் பெயர்", "f_doc_date": "ஆவண தேதி", "f_exec_date": "நிறைவேற்றப்பட்ட தேதி", "f_parties": "நபர்கள் (JSON)", "warn_officer_ok": "அதிகாரியின் ஒப்புதல் ஆவணத்தை உறுதிசெய்து டிஜிட்டல் முத்திரையிடுகிறது.", "btn_save_corrections": "திருத்தங்களை சேமிக்கவும்", "btn_officer_approve_seal": "அதிகாரி ஒப்புதல் & முத்திரை", "btn_officer_reject": "அதிகாரி நிராகரிப்பு", "ph_rej_reason": "நிராகரிப்புக்கான காரணம் (கட்டாயம்)", "btn_view_cert_qr": "சான்றிதழ் & QR பார்க்க", "footer_title": "ஒன்பூமி · ஆஃப்லைன் பதிவேடு கன்சோல்", "footer_sub": "விற்பனைப் பத்திரங்கள் · ஒப்பந்தங்கள் · ஜிபிஏ", "footer_cloud": "கிளவுட் இல்லை. விசைகள் அலுவலகத்தை விட்டு வெளியேறாது.", "chk_area_validation_name": "நிலப் பரப்பளவு எல்லைச் சரிபார்ப்பு", "chk_area_validation_msg": "பரப்பளவு செல்லுபடியாகும்.", "chk_date_validation_name": "தேதி பகுப்பாய்வு & தர்க்கரீதியான வரிசை", "chk_date_validation_msg": "ஆவணத் தேதிகள் சரியான வரிசையில் உள்ளன.", "chk_survey_number_validation_name": "சர்வே எண் சரிபார்ப்பு", "chk_survey_number_validation_msg": "சர்வே எண் வடிவம் சட்டப்பூர்வமானது.", "chk_internal_consistency_name": "உள் நிலைத்தன்மை சரிபார்ப்பு", "chk_internal_consistency_msg": "பத்திரப் பிரிவுகளில் முரண்பாடுகள் எதுவும் இல்லை.", "chk_signature_detection_name": "கையொப்பம் மற்றும் முத்திரை சரிபார்ப்பு", "chk_signature_detection_msg": "ஸ்கேன் செய்யப்பட்ட ஆவணத்தில் கையொப்பங்கள் மற்றும் முத்திரைகள் உறுதிசெய்யப்பட்டன."}};
 
 function applyConsoleLanguage(lang) {
   if (!CONSOLE_I18N[lang]) lang = 'en';
@@ -1603,6 +1630,7 @@ BADGE_LABELS = {
     "APPROVED": "Approved & sealed",
     "REJECTED": "Rejected",
     "FAIL": "Checks failed",
+    "DUPLICATE": "Duplicate Detected",
 }
 
 
@@ -1617,6 +1645,9 @@ def _stepper_markup(status: str) -> str:
     if status == "APPROVED":
         states = ["done", "done", "done", "done"]
         labels = ["Scan", "Machine check", "Clerk review", "Sealed"]
+    elif status == "DUPLICATE":
+        states = ["done", "bad", "bad", ""]
+        labels = ["Scan", "Duplicate flagged", "Review blocked", "Prohibited"]
     elif status == "REJECTED":
         states = ["done", "done", "done", "bad"]
         labels = ["Scan", "Machine check", "Clerk review", "Rejected"]
@@ -1782,12 +1813,17 @@ def _clerk_panel(record: dict, message: str) -> str:
     current_status = record.get("status")
     is_approved = current_status == "APPROVED"
     is_rejected = current_status == "REJECTED"
-    readonly_attr = "readonly" if is_approved else ""
+    dup_info = record.get("duplicate_info")
+    is_duplicate = current_status == "DUPLICATE" or bool(dup_info)
+    readonly_attr = "readonly" if (is_approved or is_duplicate) else ""
 
     has_critical_fail = any(
         c.get("status") == "FAIL" and c.get("severity") == "critical" for c in checks
     )
-    if has_critical_fail:
+    if is_duplicate:
+        warn = '<p class="warnbox stop">Officer approval is blocked: duplicate registration attempt detected.</p>'
+        approve_disabled = "disabled"
+    elif has_critical_fail:
         warn = (
             '<p class="warnbox stop">Officer approval is locked while critical checks fail. '
             "Correct the flagged fields and Save Corrections first.</p>"
@@ -1811,6 +1847,29 @@ def _clerk_panel(record: dict, message: str) -> str:
               <input type="text" name="rejection_reason" id="rejection_reason" placeholder="Reason to revoke approval (required)" aria-label="Rejection reason">
               <button type="submit" name="action" value="reject" class="btn btn-outline-red" data-i18n="btn_officer_reject"
                 onclick="if(!document.getElementById('rejection_reason').value.trim()) {{ alert('Please provide a reason to revoke approval.'); return false; }} return confirm('Are you sure you want to revoke the certified seal and reject this record?');">Revoke / Officer Reject</button>
+            </div>
+          </div>
+        </div>
+        """
+    elif is_duplicate:
+        dup_matched = (dup_info or {}).get("matched_record_id", "")
+        dup_sealed = (dup_info or {}).get("sealed_at", "Certified")
+        dup_reason = (dup_info or {}).get("match_reason", "Identical document")
+        action_buttons = f"""
+        <div class="action-panel">
+          <p class="warnbox stop" style="border-left-color:var(--stamp); background:rgba(166,25,60,0.06);">
+            ⛔ <b>Duplicate Document Detected &mdash; Officer Seal Blocked</b><br>
+            A certified sealed record already exists for this document in the registry (Record No. <b>{html.escape(dup_matched[:8].upper())}</b> sealed on {html.escape(dup_sealed)}).<br>
+            <b>Cause:</b> {html.escape(dup_reason)}.<br>
+            Re-registration of an already certified and sealed document is strictly prohibited.
+          </p>
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+            <a href="/?verification_id={html.escape(dup_matched)}" target="_blank" class="btn btn-outline-red" style="font-weight:700;">
+              View Original Sealed Certificate &amp; QR &rarr;
+            </a>
+            <div class="reject-group" style="margin-left:auto;">
+              <input type="text" name="rejection_reason" id="rejection_reason" value="Duplicate registration attempt of Record {html.escape(dup_matched[:8].upper())}" aria-label="Rejection reason">
+              <button type="submit" name="action" value="reject" class="btn btn-outline-red">Reject Duplicate Record</button>
             </div>
           </div>
         </div>
@@ -1960,6 +2019,9 @@ def _cert_panel(record: dict, host_name: str) -> str:
     else:
         qr_markup = '<canvas id="qrCanvas" width="200" height="200" aria-label="Verification QR code"></canvas>'
 
+    raw_doc_no = payload_data.get("document_number") or ""
+    default_pin = "".join(c for c in raw_doc_no if c.isalnum()) or "1234"
+
     return f"""
     <section class="panel cert rv">
       <div class="tab t-green"><span>Schedule C · Certificate of Seal</span><em>{html.escape(record.get('approved_at') or '')}</em></div>
@@ -2010,14 +2072,94 @@ def _cert_panel(record: dict, host_name: str) -> str:
           <div class="qrbox">{qr_markup}</div>
           <p class="qrurl"><a href="{html.escape(verify_url)}" target="_blank">{html.escape(verify_url)}</a></p>
           <p class="qr-hint">Scan from any phone on the same office network: the page re-checks the signature locally, offline.</p>
+
+          <div class="pdf-export-box">
+            <div class="pdf-export-title">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="vertical-align:-2px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              Sealed Certificate PDF
+            </div>
+            <p class="pdf-export-sub">Download official sealed certificate as an encrypted, tamper-evident PDF with lock.</p>
+            <button type="button" class="btn-pdf-lock" onclick="openPdfLockModal('{html.escape(rec_id)}', '{html.escape(default_pin)}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:-2px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              Export PDF with Lock
+            </button>
+            <a class="pdf-quick-link" href="/export_pdf?verification_id={html.escape(rec_id)}&lock=1" target="_blank" title="Instant download locked with default PIN">
+              📥 Direct Download (Lock PIN: {html.escape(default_pin)})
+            </a>
+          </div>
         </div>
 
         <div class="cert-actions">
+          <button type="button" class="btn btn-seal-lock" onclick="openPdfLockModal('{html.escape(rec_id)}', '{html.escape(default_pin)}')">
+            🔒 Export PDF with Lock
+          </button>
           <a class="btn btn-ghost" href="{html.escape(verify_url)}" target="_blank">Open Public Verification Page</a>
           <a class="btn btn-primary" href="/dashboard">Process New Document</a>
         </div>
       </div>
+
+      <!-- PDF Lock Modal -->
+      <div id="pdfLockModal" class="lock-modal-backdrop" onclick="if(event.target===this) closePdfLockModal()">
+        <div class="lock-modal-card">
+          <button type="button" class="lock-modal-close" onclick="closePdfLockModal()" aria-label="Close modal">&times;</button>
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--stamp)" stroke-width="2.4"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            Export Sealed PDF with Lock
+          </h3>
+          <div class="sub">OneBhoomi Cryptographic Offline Registry</div>
+          <div class="lock-modal-info">
+            <strong>Security Lock Protection:</strong> The generated official certificate will be encrypted with AES security. Recipients must enter this PIN/Password to open the PDF.
+          </div>
+          <div class="lock-input-group">
+            <label for="pdfLockPassword">Lock Password / Security PIN</label>
+            <div class="lock-input-wrapper">
+              <input type="text" id="pdfLockPassword" value="{html.escape(default_pin)}" placeholder="Enter PIN or Password" autocomplete="off">
+            </div>
+            <div style="font-size:11px;color:var(--ink-soft);margin-top:5px;">Default PIN pre-filled from document number. You can customize this before downloading.</div>
+          </div>
+          <div class="lock-modal-actions">
+            <div class="btn-row">
+              <button type="button" class="btn btn-primary" onclick="submitPdfDownload(true)" style="background:var(--stamp);border-color:var(--stamp-deep);">
+                🔒 Download Locked PDF
+              </button>
+              <button type="button" class="btn btn-ghost" onclick="submitPdfDownload(false)">
+                📄 Download Unlocked
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <script>
+        let currentLockRecId = '{html.escape(rec_id)}';
+        function openPdfLockModal(recId, defaultPin) {{
+          currentLockRecId = recId || currentLockRecId;
+          const modal = document.getElementById('pdfLockModal');
+          const input = document.getElementById('pdfLockPassword');
+          if (input && defaultPin) {{
+            input.value = defaultPin;
+          }}
+          if (modal) {{
+            modal.classList.add('active');
+          }}
+        }}
+        function closePdfLockModal() {{
+          const modal = document.getElementById('pdfLockModal');
+          if (modal) {{
+            modal.classList.remove('active');
+          }}
+        }}
+        function submitPdfDownload(withLock) {{
+          if (!currentLockRecId) return;
+          let url = '/export_pdf?verification_id=' + encodeURIComponent(currentLockRecId);
+          if (withLock) {{
+            const pwdInput = document.getElementById('pdfLockPassword');
+            const pwd = pwdInput ? pwdInput.value.trim() : '1234';
+            url += '&password=' + encodeURIComponent(pwd || '1234');
+          }}
+          window.open(url, '_blank');
+          closePdfLockModal();
+        }}
         if (document.getElementById('qrCanvas')) {{
           setTimeout(function() {{
             drawQRCode('qrCanvas', '{verify_url}');
@@ -2084,6 +2226,51 @@ def render_page(
         status = active_record["status"]
         reg_no = f"RECORD NO. {rec_id[:8].upper()}"
 
+        dup_info = active_record.get("duplicate_info")
+        if not dup_info and status != "APPROVED":
+            dup_info = verification_service.check_duplicate_document(
+                payload=active_record.get("document_payload"),
+                file_hash=active_record.get("file_hash"),
+                current_verification_id=rec_id,
+            )
+            if dup_info:
+                active_record["duplicate_info"] = dup_info
+                active_record["status"] = "DUPLICATE"
+                status = "DUPLICATE"
+
+        dup_banner = ""
+        if dup_info and status != "APPROVED":
+            matched_id = dup_info.get("matched_record_id", "")
+            sealed_at = dup_info.get("sealed_at", "Certified")
+            reason = dup_info.get("match_reason", "Identical document")
+            doc_no = dup_info.get("document_number", "")
+            doc_no_txt = f" (Doc No. {html.escape(doc_no)})" if doc_no and doc_no != "N/A" else ""
+
+            dup_banner = f"""
+            <div class="duplicate-alert-box rv in" style="margin-top: 18px; margin-bottom: 20px; border: 2px solid var(--stamp); background: #fff5f5; border-radius: 4px; padding: 18px 22px; box-shadow: 0 4px 14px rgba(166,25,60,0.12); display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;">
+              <div style="display: flex; align-items: flex-start; gap: 14px; max-width: 820px;">
+                <span style="font-size: 32px; line-height: 1; flex-shrink: 0; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));">⚠️</span>
+                <div>
+                  <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <span style="font-family: var(--serif); font-size: 17px; font-weight: 800; color: var(--stamp); letter-spacing: 0.08em; text-transform: uppercase;">DUPLICATE DETECTED</span>
+                    <span style="font-family: var(--type); font-size: 11px; font-weight: 700; background: var(--stamp); color: #fff; padding: 2px 8px; border-radius: 3px; letter-spacing: 0.06em; text-transform: uppercase;">PREVIOUSLY SEALED</span>
+                  </div>
+                  <p style="margin: 6px 0 0 0; font-size: 14.5px; color: var(--ink); line-height: 1.45;">
+                    This document{doc_no_txt} has already been registered and cryptographically sealed on <b>{html.escape(sealed_at)}</b> under Record No. <code style="font-family: var(--type); font-weight: 700; background: rgba(166,25,60,0.08); padding: 1px 6px; border-radius: 3px; color: var(--stamp-deep);">{html.escape(matched_id[:8].upper())}</code>.
+                  </p>
+                  <p style="margin: 4px 0 0 0; font-size: 12.5px; color: var(--ink-soft); font-family: var(--sans);">
+                    <b>Detection Cause:</b> {html.escape(reason)} &middot; Re-registration / re-sealing is blocked to prevent double registration.
+                  </p>
+                </div>
+              </div>
+              <div>
+                <a href="/?verification_id={html.escape(matched_id)}" target="_blank" class="btn btn-outline-red" style="padding: 10px 18px; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.04em; text-decoration: none;">
+                  <span>View Existing Sealed Certificate</span> &rarr;
+                </a>
+              </div>
+            </div>
+            """
+
         head = f"""
         <div class="console-top">
           <div class="console-head rv">
@@ -2092,7 +2279,8 @@ def render_page(
           </div>
           <p class="sub rv"><span data-i18n="lbl_record">Record</span> {html.escape(rec_id)}</p>
           {_stepper_markup(status)}
-          {_banner_markup(message, blocked=("Approval refused" in (message or "")))}
+          {dup_banner}
+          {_banner_markup(message, blocked=("Approval refused" in (message or "") or "DUPLICATE" in (message or "")))}
           {timing_info}
         </div>
         """
@@ -2202,6 +2390,9 @@ def render_verification_view(record: dict, sig_valid: bool) -> bytes:
 
     gis_html = render_gis_section(payload_data)
 
+    raw_doc_no = payload_data.get("document_number") or ""
+    default_pin = "".join(c for c in raw_doc_no if c.isalnum()) or "1234"
+
     page_html = f"""<!doctype html>
     <html lang="en">
     <head>
@@ -2283,6 +2474,23 @@ def render_verification_view(record: dict, sig_valid: bool) -> bytes:
           text-decoration:none;padding:12px 24px;border-radius:2px;
           background:var(--stamp);color:var(--paper);box-shadow:3px 3px 0 var(--stamp-deep);display:inline-block;
         }}
+        .btn-seal-lock{{background:var(--stamp);color:var(--paper);border-color:var(--stamp-deep);box-shadow:3px 3px 0 var(--stamp-deep);cursor:pointer;}}
+        .btn-seal-lock:hover{{background:var(--stamp-deep);transform:translateY(-1px);box-shadow:4px 4px 0 var(--ink);}}
+        .lock-modal-backdrop{{position:fixed;inset:0;background:rgba(34,29,23,0.68);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:9999;padding:16px;}}
+        .lock-modal-backdrop.active{{display:flex;}}
+        .lock-modal-card{{background:var(--paper);border:2px solid var(--ink);box-shadow:8px 8px 0 var(--ink);max-width:460px;width:100%;padding:24px 26px;position:relative;}}
+        .lock-modal-card h3{{font-family:var(--serif);font-size:20px;font-weight:700;color:var(--ink);margin:0 0 4px;display:flex;align-items:center;gap:8px;}}
+        .lock-modal-card .sub{{font-family:var(--type);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--stamp);margin-bottom:14px;}}
+        .lock-modal-info{{background:var(--paper-deep);border-left:3px solid var(--gold);padding:10px 12px;font-size:12.5px;color:var(--ink-soft);margin-bottom:16px;line-height:1.5;}}
+        .lock-input-group{{margin-bottom:18px;}}
+        .lock-input-group label{{display:block;font-family:var(--type);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);font-weight:700;margin-bottom:6px;}}
+        .lock-input-wrapper{{position:relative;display:flex;align-items:center;}}
+        .lock-input-wrapper input{{width:100%;font-family:var(--type);font-size:14px;padding:9px 12px;border:1.5px solid var(--ink);background:#fff;color:var(--ink);box-shadow:inset 1px 1px 3px rgba(0,0,0,0.08);}}
+        .lock-modal-actions{{display:flex;flex-direction:column;gap:10px;}}
+        .lock-modal-actions .btn-row{{display:flex;gap:10px;}}
+        .lock-modal-actions .btn-row .btn{{flex:1;text-align:center;cursor:pointer;}}
+        .lock-modal-close{{position:absolute;right:14px;top:14px;background:none;border:none;font-size:22px;font-weight:700;color:var(--ink-soft);cursor:pointer;line-height:1;}}
+        .lock-modal-close:hover{{color:var(--stamp);}}
         .gis{{margin-bottom:28px}}
         .gis .attr-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:18px 0}}
         .gis .attr{{background:var(--card);border:1px solid var(--rule);padding:12px 14px}}
@@ -2319,10 +2527,11 @@ def render_verification_view(record: dict, sig_valid: bool) -> bytes:
 
     <header>
       <div class="reg-bar">
-        <a class="brand" href="/">
-          <b>OneBhoomi</b>
-          <span>public verification</span>
+        <a class="brand" href="/" style="display:inline-flex; align-items:center; text-decoration:none;">
+          <img src="/logo.png?v=20260904d" alt="OneBhoomi" style="height:64px; width:auto; display:block; mix-blend-mode:multiply; filter:contrast(1.02);">
         </a>
+
+
         <div style="display:flex; align-items:center; gap:10px;">
           <div class="lang-picker" title="Change Language">
             <svg class="lang-svg" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;stroke:var(--stamp);fill:none;flex-shrink:0;display:inline-block;vertical-align:middle;">
@@ -2352,6 +2561,15 @@ def render_verification_view(record: dict, sig_valid: bool) -> bytes:
           <div class="fact"><b>Register Status</b><span class="pill {'ok' if status == 'APPROVED' else 'bad'}">{html.escape(status)}</span></div>
           <div class="fact"><b>Approved At</b><span class="v">{html.escape(record.get('approved_at') or 'not approved')}</span></div>
         </div>
+        <div style="margin-top:18px;padding-top:16px;border-top:1px dashed var(--rule);display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+          <button type="button" class="btn btn-seal-lock" onclick="openPdfLockModal('{html.escape(rec_id)}', '{html.escape(default_pin)}')" style="cursor:pointer;border:none;display:inline-flex;align-items:center;gap:6px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            Export PDF with Lock
+          </button>
+          <a class="btn" href="/export_pdf?verification_id={html.escape(rec_id)}&lock=1" target="_blank" style="background:var(--card);color:var(--ink);border:1px solid var(--rule);box-shadow:2px 2px 0 var(--rule);text-decoration:none;">
+            Direct Download (Lock PIN: {html.escape(default_pin)})
+          </a>
+        </div>
       </div>
     </section>
 
@@ -2376,12 +2594,76 @@ def render_verification_view(record: dict, sig_valid: bool) -> bytes:
       <div class="foot-note">
         <span>OneBhoomi · Offline Registry</span>
         <span>Signature checked on this device's request, no cloud involved</span>
-        <span><a class="btn" href="/">Registry Office</a></span>
+        <span><a class="btn" href="javascript:void(0)" onclick="openPdfLockModal('{html.escape(rec_id)}', '{html.escape(default_pin)}')" style="background:var(--stamp);margin-right:8px;cursor:pointer;">🔒 Export PDF with Lock</a><a class="btn" href="/">Registry Office</a></span>
       </div>
     </footer>
 
     </div>
     <div class="perf bottom" aria-hidden="true"></div>
+
+    <!-- PDF Lock Modal -->
+    <div id="pdfLockModal" class="lock-modal-backdrop" onclick="if(event.target===this) closePdfLockModal()">
+      <div class="lock-modal-card">
+        <button type="button" class="lock-modal-close" onclick="closePdfLockModal()" aria-label="Close modal">&times;</button>
+        <h3>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--stamp)" stroke-width="2.4"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          Export Sealed PDF with Lock
+        </h3>
+        <div class="sub">OneBhoomi Cryptographic Offline Registry</div>
+        <div class="lock-modal-info">
+          <strong>Security Lock Protection:</strong> The generated official certificate is encrypted with AES security. Recipients must enter this PIN/Password to open the PDF.
+        </div>
+        <div class="lock-input-group">
+          <label for="pdfLockPassword">Lock Password / Security PIN</label>
+          <div class="lock-input-wrapper">
+            <input type="text" id="pdfLockPassword" value="{html.escape(default_pin)}" placeholder="Enter PIN or Password" autocomplete="off">
+          </div>
+          <div style="font-size:11px;color:var(--ink-soft);margin-top:5px;">Default PIN pre-filled from document number. You can customize this before downloading.</div>
+        </div>
+        <div class="lock-modal-actions">
+          <div class="btn-row">
+            <button type="button" class="btn btn-primary" onclick="submitPdfDownload(true)" style="background:var(--stamp);border-color:var(--stamp-deep);">
+              🔒 Download Locked PDF
+            </button>
+            <button type="button" class="btn btn-ghost" onclick="submitPdfDownload(false)">
+              📄 Download Unlocked
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let currentLockRecId = '{html.escape(rec_id)}';
+      function openPdfLockModal(recId, defaultPin) {{
+        currentLockRecId = recId || currentLockRecId;
+        const modal = document.getElementById('pdfLockModal');
+        const input = document.getElementById('pdfLockPassword');
+        if (input && defaultPin) {{
+          input.value = defaultPin;
+        }}
+        if (modal) {{
+          modal.classList.add('active');
+        }}
+      }}
+      function closePdfLockModal() {{
+        const modal = document.getElementById('pdfLockModal');
+        if (modal) {{
+          modal.classList.remove('active');
+        }}
+      }}
+      function submitPdfDownload(withLock) {{
+        if (!currentLockRecId) return;
+        let url = '/export_pdf?verification_id=' + encodeURIComponent(currentLockRecId);
+        if (withLock) {{
+          const pwdInput = document.getElementById('pdfLockPassword');
+          const pwd = pwdInput ? pwdInput.value.trim() : '1234';
+          url += '&password=' + encodeURIComponent(pwd || '1234');
+        }}
+        window.open(url, '_blank');
+        closePdfLockModal();
+      }}
+    </script>
 
     </body>
     </html>
@@ -2396,7 +2678,23 @@ class LandExtractorHandler(BaseHTTPRequestHandler):
         query_params = parse_qs(parsed.query)
         host_name = self.headers.get("Host", f"localhost:{self.server.server_address[1]}")
 
+        # Serve brand logo image
+        if parsed.path in {"/logo.png", "/logo", "/static/logo.png"}:
+            logo_path = Path(__file__).parent / "logo.png"
+            if logo_path.exists():
+                data = logo_path.read_bytes()
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0")
+                self.send_header("Pragma", "no-cache")
+                self.send_header("Expires", "0")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                return
+
         # Quick OCR URL update endpoint: /set_ocr_url?url=https://...
+
         if parsed.path == "/set_ocr_url":
             new_url = query_params.get("url", [None])[0]
             if new_url:
@@ -2416,6 +2714,68 @@ class LandExtractorHandler(BaseHTTPRequestHandler):
                     return
             self.send_error(HTTPStatus.BAD_REQUEST, "Missing url parameter")
             return
+
+        # Official Certificate Export with Lock: /export_pdf?verification_id=...&password=...&lock=...
+        if parsed.path in {"/export_pdf", "/export_locked_pdf", "/download_pdf"}:
+            rec_id = query_params.get("verification_id", [None])[0] or query_params.get("id", [None])[0]
+            if not rec_id:
+                self.send_error(HTTPStatus.BAD_REQUEST, "Missing verification_id parameter")
+                return
+            record = verification_service.get_record(rec_id)
+            if not record:
+                self.send_error(HTTPStatus.NOT_FOUND, "Verification record not found")
+                return
+
+            raw_pwd = query_params.get("password", [None])[0]
+            lock_flag = query_params.get("lock", [None])[0]
+            password = None
+            if raw_pwd is not None and str(raw_pwd).strip():
+                password = str(raw_pwd).strip()
+            elif lock_flag:
+                lf_clean = str(lock_flag).strip()
+                if lf_clean.lower() not in {"1", "true", "yes", "default", "lock"}:
+                    password = lf_clean
+                else:
+                    doc_no = record.get("document_payload", {}).get("document_number") or ""
+                    clean_doc = "".join(ch for ch in doc_no if ch.isalnum())
+                    password = clean_doc if clean_doc else "1234"
+
+            port = os.environ.get("PORT", 8001)
+            lan_ip = get_lan_ip()
+            public_tunnel = get_public_web_tunnel()
+            if not public_tunnel or public_tunnel.startswith("http://localhost") or public_tunnel.startswith("http://127.0.0.1"):
+                if host_name and not host_name.startswith("localhost") and not host_name.startswith("127.0.0.1"):
+                    public_tunnel = f"http://{host_name}"
+                elif lan_ip and lan_ip != "127.0.0.1":
+                    public_tunnel = f"http://{lan_ip}:{port}"
+                else:
+                    public_tunnel = f"http://localhost:{port}"
+
+            verify_url = f"{public_tunnel}/?verification_id={rec_id}"
+            try:
+                pdf_bytes = certificate_pdf_service.generate_certificate_pdf(
+                    record=record,
+                    password=password,
+                    verify_url=verify_url,
+                    host_name=host_name
+                )
+                doc_num_raw = record.get("document_payload", {}).get("document_number", "")
+                safe_doc_num = "".join(c if c.isalnum() else "-" for c in doc_num_raw).strip("-") or rec_id[:8]
+                suffix = "-locked" if password else ""
+                filename = f"OneBhoomi-Certificate-{safe_doc_num}{suffix}.pdf"
+
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "application/pdf")
+                self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+                self.send_header("Content-Length", str(len(pdf_bytes)))
+                self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+                self.end_headers()
+                self.wfile.write(pdf_bytes)
+                return
+            except Exception as exc:
+                print(f"Error generating certificate PDF: {exc}")
+                self.send_error(HTTPStatus.INTERNAL_SERVER_ERROR, f"PDF generation error: {exc}")
+                return
 
         # Verification view routing (offline QR validation & public certificate)
         verification_id = query_params.get("verification_id", [None])[0]
@@ -2529,6 +2889,9 @@ class LandExtractorHandler(BaseHTTPRequestHandler):
                 content = landing_file.read_bytes()
                 self.send_response(HTTPStatus.OK)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0")
+                self.send_header("Pragma", "no-cache")
+                self.send_header("Expires", "0")
                 self.send_header("Content-Length", str(len(content)))
                 self.end_headers()
                 self.wfile.write(content)
@@ -2720,33 +3083,48 @@ class LandExtractorHandler(BaseHTTPRequestHandler):
                         pass
 
                 # Recompute automated validation checks
-                checks = verification_service.run_verification_checks(payload)
+                checks = verification_service.run_verification_checks(
+                    payload,
+                    file_hash=record.get("file_hash"),
+                    current_verification_id=verification_id,
+                )
                 status = verification_service.calculate_overall_status(checks)
+                dup_info = verification_service.check_duplicate_document(
+                    payload=payload,
+                    file_hash=record.get("file_hash"),
+                    current_verification_id=verification_id,
+                )
 
                 record["document_payload"] = payload
                 record["checks"] = checks
                 record["status"] = status
+                record["duplicate_info"] = dup_info
 
                 if action == "approve":
-                    has_critical_fail = any(
-                        c.get("status") == "FAIL" and c.get("severity") == "critical"
-                        for c in checks
-                    )
-                    if has_critical_fail:
-                        message = "Approval refused: critical automated checks failed."
+                    if status == "DUPLICATE" or dup_info:
+                        matched_id = (dup_info or {}).get("matched_record_id", "")
+                        message = f"Approval refused: Duplicate detected. This document matches sealed Record {matched_id[:8].upper()}."
                         verification_service.save_record(record)
                     else:
-                        sig = verification_service.sign_document(payload)
-                        pub_key = verification_service.get_public_verification_key()
-
-                        record["status"] = "APPROVED"
-                        record["signature"] = sig
-                        record["public_key"] = pub_key
-                        record["approved_at"] = datetime.utcnow().strftime(
-                            "%Y-%m-%dT%H:%M:%SZ"
+                        has_critical_fail = any(
+                            c.get("status") == "FAIL" and c.get("severity") == "critical"
+                            for c in checks
                         )
-                        verification_service.save_record(record)
-                        message = "Document approved and sealed successfully."
+                        if has_critical_fail:
+                            message = "Approval refused: critical automated checks failed."
+                            verification_service.save_record(record)
+                        else:
+                            sig = verification_service.sign_document(payload)
+                            pub_key = verification_service.get_public_verification_key()
+
+                            record["status"] = "APPROVED"
+                            record["signature"] = sig
+                            record["public_key"] = pub_key
+                            record["approved_at"] = datetime.utcnow().strftime(
+                                "%Y-%m-%dT%H:%M:%SZ"
+                            )
+                            verification_service.save_record(record)
+                            message = "Document approved and sealed successfully."
                 elif action == "correct":
                     verification_service.save_record(record)
                     message = "Clerk review corrections saved successfully."
@@ -3060,8 +3438,10 @@ class LandExtractorHandler(BaseHTTPRequestHandler):
                 </div>
                 """
 
-            # Create local verification record instantly
-            record = verification_service.create_verification_record(result)
+            # Create local verification record instantly with file hash for duplicate detection
+            file_hash = hashlib.sha256(uploaded).hexdigest() if uploaded else None
+            record = verification_service.create_verification_record(result, file_hash=file_hash)
+            record["filename"] = filename
             verification_service.save_record(record)
 
             from semantic_extractor import clean_user_facing_schema
@@ -3092,7 +3472,12 @@ class LandExtractorHandler(BaseHTTPRequestHandler):
                   <img src="data:{mime_type};base64,{image_data}" style="width: 100%; max-width: 100%; border: 1.5px solid var(--rule); box-shadow: 0 4px 20px rgba(0,0,0,0.12); background: #fff; display: block;" alt="Uploaded scan copy">
                 </div>
                 """
-            message = f"Processed {html.escape(filename)}. Verification record created and machine checklist run."
+            if record.get("status") == "DUPLICATE" or record.get("duplicate_info"):
+                dup = record.get("duplicate_info") or {}
+                dup_id = dup.get("matched_record_id", "")
+                message = f"DUPLICATE DETECTED: This document has already been registered and cryptographically sealed (Record No. {dup_id[:8].upper()})."
+            else:
+                message = f"Processed {html.escape(filename)}. Verification record created and machine checklist run."
 
             if temp_path:
                 try:

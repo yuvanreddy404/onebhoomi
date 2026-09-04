@@ -1,125 +1,124 @@
-# Offline Land Document Extraction & Standalone Verification Console
+# OneBhoomi (వన్‌భూమి / वनभूमि) 🏛️📜
 
-A complete, standalone local application for extracting structured data from Indian land records (Sale Deeds, Agreements of Sale, GPAs) using OCR, executing automated validation checks, providing human-in-the-loop clerk corrections, and applying local **RSA-PSS (2048-bit) cryptographic digital seals** with offline QR code verification over local network (LAN).
+**Air-Gapped Land Record Extraction, Cadastral GIS Grounding & RSA-PSS Cryptographic Sealing Console**
 
----
-
-## Key Features
-
-- **Dual OCR Extraction Modes:**
-  - **Local CPU Mode:** Runs directly on local CPU without external dependencies.
-  - **Remote GPU Mode:** Optional connection to high-speed Kaggle/Colab GPU workers for accelerated OCR inference.
-- **State-Aware & Continuation-Safe Field Extraction:**
-  - Extracts canonical document facts: `document_type`, `document_number`, `serial_number`, `document_date`, `execution_date`, `parties`, `survey_number`, `sub_survey_number`, `village`, `mandal`, `district`, `stamp_number`, `stamp_value`, and `sold_to`.
-  - Intelligently parses complex Indian survey designations (e.g. `CSNO.2(65/9`, `Sy.No`, `Patta No`).
-  - Implements multi-page continuation safety (`CONTINUES_ON_NEXT_PAGE`), preserving explicit Page 1 facts while avoiding hallucinating missing schedules.
-- **Verification Workflow Console:**
-  - **Stage 1 — Automated Validation:** Evaluates required fields, area numeric boundaries, date logic, and survey formats.
-  - **Stage 2 — Clerk Review & Correction:** Interactive editor allowing clerks to verify and correct OCR errors prior to certification.
-  - **Stage 3 — Officer Approval / Rejection:** Officer approval seals the reviewed document facts; rejection records non-certified status with clear feedback.
-- **Local RSA-PSS 2048-bit Cryptographic Sealing:**
-  - Computes deterministic SHA-256 / RSA-PSS signatures over canonical JSON representations (`canonicalize_document`).
-  - Maintains strict immutability for certified records (`APPROVED`).
-- **Offline LAN QR Code Verification:**
-  - Automatically generates an offline client-side QR code bound to the host's local network IP (`0.0.0.0`).
-  - Mobile devices on the same Wi-Fi/LAN can scan the QR code to view a standalone verification certificate and validate the signature instantly.
+OneBhoomi is a production-grade, offline-first government registry application engineered for Indian sub-registrar offices. It reads scanned physical deed documents (Sale Deeds, Agreements of Sale, General Power of Attorney), extracts canonical legal facts, grounds land parcels against official Telangana (TGRAC) and Karnataka cadastral GIS datasets, prevents double-registration through duplicate ledger checks, allows clerk review/correction, and cryptographically seals every approved deed with local **RSA-PSS (2048-bit)** digital signatures.
 
 ---
 
-## Architecture & Workflow
+## 🌟 Key Capabilities
+
+1. **Air-Gapped & Offline Security**
+   - 100% self-contained Python architecture with zero external cloud dependencies.
+   - Local RSA-PSS (2048-bit) private key generation and management in secure local storage.
+   - Built for air-gapped government registry workstations and offline intranet LANs.
+
+2. **Hybrid OCR Extraction & Pipeline**
+   - **Local CPU Engine:** Native PaddleOCR / lightweight pipeline directly on device.
+   - **Remote GPU Acceleration:** Automated, transparent tunnel integration with remote Kaggle / Colab GPU workers (`T4 x2`) via `kaggle_gpu_server.py`.
+
+3. **Domain-Aware Legal Entity & Survey Parsing**
+   - Normalizes 14+ canonical property fields: document dates, execution dates, parties (vendors, purchasers, claimants), stamp duty values, serial numbers, and complex survey numbers (`CSNO.2(65/9`, `Sy.No`, `Patta No`, etc.).
+   - Multi-page continuation detection (`CONTINUES_ON_NEXT_PAGE`) to safeguard Schedule of Property boundaries.
+
+4. **Cadastral GIS Spatial Grounding (Telangana TGRAC & Karnataka)**
+   - High-performance offline spatial index with 11,000+ Telangana revenue villages and survey centroids.
+   - Automatic coordinate resolution, survey-boundary validation, and visual parcel mapping.
+
+5. **Dual-Layer Duplicate & Double-Registration Prevention**
+   - **Layer 1 (Cryptographic Hash):** Instant SHA-256 binary hash detection prevents uploading identical scans.
+   - **Layer 2 (Canonical Identity Ledger):** Matches normalized `document_number`, `survey_number`, and `village` against existing sealed records.
+   - Automatically blocks officer approval for duplicates and provides direct links to the existing sealed certificate.
+
+6. **Interactive Clerk Review & Officer Approval Console**
+   - Side-by-side zoomable document scan preview alongside editable structured fields.
+   - Automated multi-rule Schedule A checklist (required fields, area consistency, date logic, survey formatting).
+   - Clerk audit trail and corrections logged before final officer digital signature.
+
+7. **Cryptographic Sealing & Offline LAN QR Verification**
+   - Deterministic JSON canonicalization signed with RSA-PSS SHA-256.
+   - Standalone offline verification certificates with dynamic QR code accessible across the local network (LAN) and public tunnels.
+
+8. **Exportable Sealed PDF Certificate with PIN Lock & Cadastral Map**
+   - Download official, court-admissible PDF certificates.
+   - Optional RC4 128-bit owner/user password protection (PIN lock).
+   - Includes full transaction metadata, cryptographic hashes, verification seal, and embedded high-resolution GIS cadastral survey map.
+
+9. **Multilingual Operational Dashboard & Analytics**
+   - Real-time KPIs: Total on File, Sealed & Certified, Clerk Review Queue, Non-Certified.
+   - Vector SVG analytics: Registration Velocity trend and Document Classification breakdown.
+   - Instant language switcher supporting **English, Hindi (हिंदी), Telugu (తెలుగు), Kannada (ಕನ್ನಡ), and Tamil (தமிழ்)**.
+
+---
+
+## 🏛️ System Architecture
 
 ```mermaid
 flowchart TD
-    A[Upload Land Document] --> B{OCR Engine}
-    B -->|Local CPU| C[PaddleOCR / Extractor Pipeline]
-    B -->|Kaggle GPU Tunnel| C
-    C --> D[Normalization & Canonical Payload Assembly]
-    D --> E[Stage 1: Automated Verification Checklist]
-    E --> F[Stage 2: Clerk Review & Correction Console]
-    F --> G{Officer Decision}
-    G -->|Approve| H[RSA-PSS 2048-bit Digital Signing]
-    G -->|Reject| I[Record Rejection Reason]
-    H --> J[Generate Standalone Certificate & LAN QR Code]
-    J --> K[Offline Mobile Verification over LAN]
+    A[Scanned Deed PDF / Image] --> B{OCR Pipeline}
+    B -->|Local CPU| C[PaddleOCR / Normalizer]
+    B -->|GPU Tunnel| C
+    C --> D[Canonical Legal Extraction]
+    D --> E[Telangana / Karnataka GIS Grounding Engine]
+    E --> F[Dual-Layer Duplicate Detection Check]
+    F --> G[Clerk Review & Correction Console]
+    G --> H{Officer Decision}
+    H -->|Approve| I[RSA-PSS 2048-bit Cryptographic Signing]
+    H -->|Reject| J[Flag Non-Certified / Record Reason]
+    I --> K[Ledger Persistence & Public LAN QR Code]
+    I --> L[Export Encrypted PDF Certificate with Cadastral Map]
 ```
 
 ---
 
-## Security & Architectural Constraints
-
-- **100% Standalone & Offline:** Zero external REST APIs, cloud databases, CDNs, or authentication servers required.
-- **Local Key Storage:** Persists RSA-PSS 2048-bit keypairs in local `verification_keys/` directory.
-- **JSON Database Persistence:** All verification records are stored locally in `verification_db.json`.
-
----
-
-## Setup & Installation
+## 🚀 Quick Start
 
 ### Prerequisites
-
 - Python 3.10+
-- `pip`
+- Modern Web Browser
 
-### 1. Clone Repository
-
-```bash
-git clone https://github.com/Samarth7887/Chatgpt-land.git
-cd Chatgpt-land
-```
-
-### 2. Install Dependencies
+### Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/yuvanreddy404/onebhoomi.git
+cd onebhoomi
+
+# Install dependencies
 pip install cryptography opencv-python numpy pypdfium2 pillow requests
 ```
-*(Optional for local CPU OCR: `pip install paddleocr paddlepaddle`)*
 
----
-
-## Running the Application
-
-### Start Web Server
+### Start the Console
 
 ```bash
 python web_app.py
 ```
-Or specify a custom port:
-```powershell
-$env:PORT=8020; python -u web_app.py
-```
 
-- **Local Access:** `http://localhost:8020`
-- **LAN Access:** `http://<YOUR_LOCAL_IP>:8020` (e.g. `http://10.71.0.80:8020`)
+By default, the server runs on port `8001` (or custom port via `PORT=8020 python web_app.py`):
+- **Dashboard:** [http://localhost:8001/dashboard](http://localhost:8001/dashboard)
+- **New Document Intake:** [http://localhost:8001/new](http://localhost:8001/new)
+- **Landing Page:** [http://localhost:8001/](http://localhost:8001/)
 
 ---
 
-## Testing & Verification
+## 📁 Repository Structure
 
-Run the core test suite and regression tests:
-
-```bash
-# Python compilation check
-python -m py_compile land_document_extractor.py verification_service.py web_app.py
-
-# Core verification integration tests
-python scratch/test_integration.py
-
-# Form binding tests
-python scratch/test_json_to_console_mapping.py
-
-# Extraction layer regression tests
-python scratch/test_extraction_fixes.py
+```
+├── web_app.py                  # HTTP server, routing, review console, and intake desk
+├── verification_service.py     # RSA-PSS 2048 signing, duplicate check, and validation rules
+├── certificate_pdf_service.py  # Court-admissible PDF generator with GIS map & PIN lock
+├── dashboard_view.py           # Multilingual analytics dashboard, KPIs & master ledger
+├── gis_service.py              # Spatial grounding engine for Telangana & Karnataka surveys
+├── land_document_extractor.py  # Rule-based OCR line parser and continuation logic
+├── semantic_extractor.py       # Normalized legal document schema builder
+├── update_ocr_url.py           # Remote GPU tunnel sync and status verification
+├── kaggle_gpu_server.py        # Remote GPU OCR worker script
+├── 01-onebhoomi-final.html     # Landing page UI
+├── logo.png                    # OneBhoomi brand emblem
+└── README.md                   # System documentation
 ```
 
 ---
 
-## Repository Structure
-
-```
-├── web_app.py                 # HTTP server, UI layout, postback handling & LAN binding
-├── verification_service.py    # Local RSA-PSS signing, validation checks & DB persistence
-├── land_document_extractor.py # Document OCR line parser, field extraction & continuation logic
-├── verification_keys/         # Persisted local RSA-PSS 2048-bit keys (Git-ignored)
-├── verification_db.json       # Local JSON database for records (Git-ignored)
-└── .gitignore                 # Excludes local keys, DBs, and virtual environments
-```
+## 🔒 Security & Privacy Notice
+OneBhoomi is strictly architected for privacy. No document scans, property identities, party names, or biometric records leave the local runtime environment. Cryptographic keys are generated locally on first seal and remain solely under the authority of the deploying sub-registrar office.
