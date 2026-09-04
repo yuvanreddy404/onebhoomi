@@ -48,25 +48,32 @@ def get_lan_ip() -> str:
 
 
 def get_public_web_tunnel() -> str:
+    global PUBLIC_TUNNEL_URL
+    if PUBLIC_TUNNEL_URL:
+        return PUBLIC_TUNNEL_URL
     port = os.environ.get("PORT", 8001)
-    txt_path = Path(__file__).parent / "web_tunnel_url.txt"
-    if txt_path.exists():
-        try:
-            url = txt_path.read_text(encoding="utf-8").strip()
-            if url.startswith("http"):
-                try:
-                    resp = requests.get(url, timeout=1.2)
-                    if resp.status_code < 500 and "no tunnel" not in resp.text.lower():
-                        return url
-                except Exception:
-                    pass
-                # Stale or dead tunnel file, remove it
-                try:
-                    txt_path.unlink(missing_ok=True)
-                except Exception:
-                    pass
-        except Exception:
-            pass
+    for txt_path in [
+        Path(__file__).parent / "web_tunnel_url.txt",
+        Path(__file__).parent / "scratch" / "public_url.txt",
+    ]:
+        if txt_path.exists():
+            try:
+                url = txt_path.read_text(encoding="utf-8").strip()
+                if url.startswith("http"):
+                    try:
+                        resp = requests.get(url, timeout=1.5)
+                        if resp.status_code < 500 and "no tunnel" not in resp.text.lower():
+                            PUBLIC_TUNNEL_URL = url
+                            return url
+                    except Exception:
+                        pass
+                    # Stale or dead tunnel file, remove it
+                    try:
+                        txt_path.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
     lan_ip = get_lan_ip()
     if lan_ip and lan_ip != "127.0.0.1":
         return f"http://{lan_ip}:{port}"
@@ -200,21 +207,32 @@ def process_uploaded_file(uploaded_bytes: bytes, filename: str) -> str:
 
 
 def generate_qr_base64(text: str) -> str:
-    """Generates an embedded Base64-encoded PNG image of the QR Code."""
+    """Generates an embedded Base64-encoded PNG/SVG image data URI of the QR Code."""
+    if not text:
+        return ""
     try:
         import qrcode
         qr = qrcode.QRCode(
-            version=1,
+            version=None,
             error_correction=qrcode.constants.ERROR_CORRECT_M,
             box_size=6,
             border=2,
         )
         qr.add_data(text)
         qr.make(fit=True)
-        img = qr.make_image(fill_color="black", back_color="white")
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        return base64.b64encode(buf.getvalue()).decode("ascii")
+        try:
+            img = qr.make_image(fill_color="black", back_color="white")
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+            return f"data:image/png;base64,{b64}"
+        except Exception:
+            import qrcode.image.svg
+            img = qr.make_image(image_factory=qrcode.image.svg.SvgImage)
+            buf = io.BytesIO()
+            img.save(buf)
+            b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+            return f"data:image/svg+xml;base64,{b64}"
     except Exception as exc:
         print(f"QR generation error: {exc}")
         return ""
@@ -274,25 +292,41 @@ def get_public_tunnel_url() -> str:
 
 def start_public_tunnel(port: int) -> None:
     global PUBLIC_TUNNEL_URL
-    cf_path = Path("scratch/cloudflared.exe")
-    if not cf_path.exists():
+    import shutil
+    candidates = [
+        Path(__file__).parent / "cloudflared.exe",
+        Path(__file__).parent / "scratch" / "cloudflared.exe",
+        Path("scratch/cloudflared.exe"),
+        shutil.which("cloudflared.exe"),
+        shutil.which("cloudflared"),
+    ]
+    cf_path = None
+    for cand in candidates:
+        if cand and Path(cand).exists():
+            cf_path = str(cand)
+            break
+    if not cf_path:
+        print("[TUNNEL] cloudflared binary not found; using LAN IP fallback.")
         return
     try:
         import subprocess
         proc = subprocess.Popen(
-            [str(cf_path), "tunnel", "--url", f"http://127.0.0.1:{port}", "--no-autoupdate"],
+            [cf_path, "tunnel", "--url", f"http://127.0.0.1:{port}", "--no-autoupdate"],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
         )
         for line in proc.stdout:
-            m = re.search(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com", line)
+            m = re.search(r"https://[a-zA-Z0-9.-]+\.trycloudflare\.com", line)
             if m:
                 PUBLIC_TUNNEL_URL = m.group(0)
                 print(f"[TUNNEL] Mobile & Internet Access URL: {PUBLIC_TUNNEL_URL}")
                 try:
-                    Path("scratch/public_url.txt").write_text(
+                    (Path(__file__).parent / "web_tunnel_url.txt").write_text(
+                        PUBLIC_TUNNEL_URL, encoding="utf-8"
+                    )
+                    (Path(__file__).parent / "scratch" / "public_url.txt").write_text(
                         PUBLIC_TUNNEL_URL, encoding="utf-8"
                     )
                 except Exception:
@@ -626,15 +660,62 @@ HTML_PAGE = Template("""<!doctype html>
       word-break:break-all;padding:10px 12px;max-height:90px;overflow:auto;line-height:1.6;margin-top:6px;
     }
     .seal-side{display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center}
-    .seal-wrap{position:relative;width:min(240px,70vw)}
+    .seal-wrap{
+      position:relative;
+      width:min(240px,70vw);
+      transform-origin:center center;
+      animation:stampDown 0.85s cubic-bezier(0.18, 0.89, 0.32, 1.28) both;
+    }
+    .seal-wrap::after{
+      content:'';
+      position:absolute;
+      inset:-12px;
+      border-radius:50%;
+      border:2px solid #C9A227;
+      opacity:0;
+      pointer-events:none;
+      animation:stampRipple 0.8s cubic-bezier(0.1, 0.8, 0.3, 1) 0.45s 1 forwards;
+    }
+    @keyframes stampDown {
+      0% {
+        opacity: 0;
+        transform: scale(2.8) rotate(-18deg) translateY(-30px);
+        filter: drop-shadow(0 30px 20px rgba(0,0,0,0.3)) blur(3px);
+      }
+      50% {
+        opacity: 0.9;
+        transform: scale(1.12) rotate(-3deg) translateY(-4px);
+        filter: drop-shadow(0 12px 10px rgba(201,162,39,0.25)) blur(1px);
+      }
+      70% {
+        opacity: 1;
+        transform: scale(0.94) rotate(1deg) translateY(0);
+        filter: drop-shadow(0 4px 6px rgba(201,162,39,0.35));
+      }
+      85% {
+        transform: scale(1.03) rotate(-0.5deg);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1) rotate(0deg);
+        filter: drop-shadow(0 0 0 transparent);
+      }
+    }
+    @keyframes stampRipple {
+      0% { transform: scale(0.85); opacity: 0.8; }
+      50% { opacity: 0.4; }
+      100% { transform: scale(1.35); opacity: 0; }
+    }
     .big-seal{width:100%;animation:slowspin 90s linear infinite}
     @keyframes slowspin{to{transform:rotate(360deg)}}
     .seal-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
     .seal-center b{font-family:var(--serif);font-weight:900;font-size:26px;letter-spacing:.06em;color:var(--ink)}
     .seal-center span{font-family:var(--type);font-size:9.5px;letter-spacing:.26em;color:var(--stamp);text-transform:uppercase;margin-top:4px}
     .qrbox{background:#fff;border:1.5px solid var(--ink);padding:14px;box-shadow:5px 5px 0 rgba(34,29,23,.14);transform:rotate(1.4deg)}
-    .qrbox canvas{display:block}
+    .qrbox canvas,.qrbox img{display:block;margin:0 auto;max-width:100%;height:auto;}
     .qrurl{font-family:var(--type);font-size:11px;color:var(--ink-soft);word-break:break-all;max-width:260px}
+    .qrurl a{color:var(--stamp-deep);text-decoration:underline;word-break:break-all;transition:opacity 0.2s}
+    .qrurl a:hover{opacity:0.8;text-decoration:underline}
     .qr-hint{font-size:12px;color:var(--ink-soft);max-width:260px}
     .cert-actions{grid-column:1/-1;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;border-top:1px solid var(--rule);padding-top:22px;margin-top:4px}
 
@@ -675,9 +756,8 @@ HTML_PAGE = Template("""<!doctype html>
     .gis .infonote{background:var(--paper-deep);border-left:4px solid var(--stamp);padding:12px 16px;font-size:13.5px;color:var(--ink-soft);margin-bottom:14px}
     .gis .village-warn{background:rgba(169,106,31,.1);border-left:4px solid var(--amber);padding:10px 14px;font-size:13px;color:var(--amber);margin-bottom:14px}
     .gis .src-note{font-family:var(--type);font-size:11.5px;color:var(--ink-soft);font-style:italic;margin-bottom:16px}
-    .gis .map-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:20px;align-items:start}
-    @media(max-width:900px){.gis .map-grid{grid-template-columns:1fr}}
-    .gis #gis-map{width:100%;height:380px;border:1.5px solid var(--rule);background:var(--paper-deep);z-index:1}
+    .gis .map-grid{display:block}
+    .gis #gis-map{width:100%;height:400px;border:1.5px solid var(--rule);background:var(--paper-deep);z-index:1}
     .gis .legend{font-size:12px;background:var(--card);border:1px solid var(--rule);padding:10px 14px;margin-top:10px;display:flex;flex-wrap:wrap;gap:16px;align-items:center}
     .gis .legend .sw{display:inline-block;width:14px;height:14px;border-radius:3px;margin-right:6px;vertical-align:-2px}
     .gis .legend .lbl{font-weight:600;color:var(--ink)}
@@ -699,6 +779,7 @@ HTML_PAGE = Template("""<!doctype html>
     @media (prefers-reduced-motion: reduce){
       .rv{opacity:1;transform:none;transition:none}
       .big-seal{animation:none}
+      .seal-wrap,.seal-wrap::after{animation:none}
       .ov-pipe .shaft{animation:none}
       html{scroll-behavior:auto}
       .dropzone,.btn{transition:none}
@@ -723,7 +804,7 @@ HTML_PAGE = Template("""<!doctype html>
   <div class="wrap reg-bar">
     <a class="brand" href="/">
       <b>OneBhoomi</b>
-      <span>वनभूमि &nbsp;·&nbsp; registry console</span>
+      <span>registry console</span>
     </a>
     <nav aria-label="Sections">
       <a href="/" data-i18n="nav_registry">Registry</a>
@@ -1174,14 +1255,14 @@ $stage_markup
       var ctx = canvas.getContext('2d');
       
       var qr = null;
-      for (var type = 1; type <= 11; type++) {
+      for (var type = 1; type <= 40; type++) {
         try {
           qr = new QRCodeLib.QRCodeModel(type, QRCodeLib.QRErrorCorrectLevel.M);
           qr.addData(text);
           qr.make();
           break;
         } catch (e) {
-          if (type === 11) {
+          if (type === 40) {
             console.error("QR Code generation overflow:", e);
             return;
           }
@@ -1400,10 +1481,6 @@ def render_gis_section(ocr_payload: dict) -> str:
     if gis_data.get("village_status") == "NOT_RESOLVED":
         village_display += ' <span style="font-family:var(--type);font-size:11px;color:var(--amber);font-weight:400;">(not in dataset)</span>'
 
-    dims_info = gis_data.get("dimensions") or {}
-    area_str = f"{dims_info.get('area_sqm', 'N/A')} m² ({dims_info.get('area_sqft', 'N/A')} sq ft)" if dims_info else "Dimensions not extracted"
-    dims_str = f"{dims_info.get('east_west_m', 'N/A')} m × {dims_info.get('north_south_m', 'N/A')} m" if dims_info else "N/A"
-
     return f"""
     <!-- GIS PROPERTY LOCATION VERIFICATION PANEL -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
@@ -1422,9 +1499,6 @@ def render_gis_section(ocr_payload: dict) -> str:
       <div class="infonote">
         Resolved from the location information extracted out of the document, against the local GIS dataset only.
       </div>
-      """ + (f"""
-      <div class="village-warn">⚠ {html.escape(gis_data.get('village_disclaimer'))}</div>
-      """ if (gis_data.get("village_disclaimer") and not str(gis_data.get("village_disclaimer", "")).startswith("Contradictory")) else "") + f"""
 
       <div class="src-note">Note: {html.escape(gis_data.get('disclaimer') or '')} Source: {html.escape(gis_data.get('source_attribution') or 'geoBoundaries')}</div>
 
@@ -1452,26 +1526,6 @@ def render_gis_section(ocr_payload: dict) -> str:
           <div class="coords">
             <span>Coordinates: <strong>{lat}, {lng}</strong></span>
             <span>Dataset: <strong>{html.escape(gis_data.get('source_attribution') or 'geoBoundaries')}</strong></span>
-          </div>
-        </div>
-
-        <!-- SPATIAL METRICS -->
-        <div>
-          <div class="metric">
-            <h4>Dimensions &amp; Parcel Estimate</h4>
-            <p><b>Approximate area:</b> {html.escape(area_str)}</p>
-            <p><b>Document dimensions:</b> {html.escape(dims_str)}</p>
-            """ + (f"""
-            <div class="disclaimer">⚠ {html.escape(dims_info.get('disclaimer', ''))}</div>
-            """ if dims_info else "") + f"""
-          </div>
-
-          <div class="metric">
-            <h4>Cadastral Survey Boundary</h4>
-            <p><b>Cadastral status:</b> NOT_AVAILABLE</p>
-            <div class="quiet">
-              Authoritative cadastral survey boundaries are not currently available in the offline GIS registry. The estimated parcel rectangle is an approximate visualization based on document dimensions and is NOT an authoritative cadastral boundary.
-            </div>
           </div>
         </div>
       </div>
@@ -1869,8 +1923,8 @@ def _cert_panel(record: dict, host_name: str) -> str:
     payload_data = record["document_payload"]
     prop = payload_data.get("property", {}) or {}
     parties = payload_data.get("parties", []) or []
-    sig = record.get("signature", "")
-    pub_key = record.get("public_key", "")
+    sig = record.get("signature") or ""
+    pub_key = record.get("public_key") or ""
 
     sig_valid = False
     if sig and pub_key:
@@ -1886,10 +1940,25 @@ def _cert_panel(record: dict, host_name: str) -> str:
         for p in parties
         if isinstance(p, dict)
     )
+    port = os.environ.get("PORT", 8001)
+    lan_ip = get_lan_ip()
     public_tunnel = get_public_web_tunnel()
+    if not public_tunnel or public_tunnel.startswith("http://localhost") or public_tunnel.startswith("http://127.0.0.1"):
+        if host_name and not host_name.startswith("localhost") and not host_name.startswith("127.0.0.1"):
+            public_tunnel = f"http://{host_name}"
+        elif lan_ip and lan_ip != "127.0.0.1":
+            public_tunnel = f"http://{lan_ip}:{port}"
+        else:
+            public_tunnel = f"http://localhost:{port}"
+
     verify_url = f"{public_tunnel}/?verification_id={rec_id}"
     qr_b64 = generate_qr_base64(verify_url)
-    qr_markup = f'<img src="data:image/png;base64,{qr_b64}" width="180" height="180" alt="Verification QR Code" style="display:block;margin:0 auto;border-radius:2px;">' if qr_b64 else '<canvas id="qrCanvas" width="200" height="200" aria-label="Verification QR code"></canvas>'
+    if qr_b64.startswith("data:"):
+        qr_markup = f'<img src="{qr_b64}" width="180" height="180" alt="Verification QR Code" style="display:block;margin:0 auto;border-radius:2px;background:#fff;">'
+    elif qr_b64:
+        qr_markup = f'<img src="data:image/png;base64,{qr_b64}" width="180" height="180" alt="Verification QR Code" style="display:block;margin:0 auto;border-radius:2px;background:#fff;">'
+    else:
+        qr_markup = '<canvas id="qrCanvas" width="200" height="200" aria-label="Verification QR code"></canvas>'
 
     return f"""
     <section class="panel cert rv">
@@ -1910,7 +1979,6 @@ def _cert_panel(record: dict, host_name: str) -> str:
           <p class="crypto-h">Cryptographic Security</p>
           <p class="crypto-line"><strong>Algorithm:</strong> RSA-PSS / SHA-256, keypair held in <span style="font-family:var(--type);">verification_keys/</span></p>
           {sig_state}
-          <div class="sigbox">{html.escape(sig)}</div>
         </div>
 
         <div class="seal-side">
@@ -1940,12 +2008,12 @@ def _cert_panel(record: dict, host_name: str) -> str:
           </div>
 
           <div class="qrbox">{qr_markup}</div>
-          <p class="qrurl">{html.escape(verify_url)}</p>
+          <p class="qrurl"><a href="{html.escape(verify_url)}" target="_blank">{html.escape(verify_url)}</a></p>
           <p class="qr-hint">Scan from any phone on the same office network: the page re-checks the signature locally, offline.</p>
         </div>
 
         <div class="cert-actions">
-          <a class="btn btn-ghost" href="/?verification_id={html.escape(rec_id)}">Open Public Verification Page</a>
+          <a class="btn btn-ghost" href="{html.escape(verify_url)}" target="_blank">Open Public Verification Page</a>
           <a class="btn btn-primary" href="/dashboard">Process New Document</a>
         </div>
       </div>
@@ -2227,19 +2295,12 @@ def render_verification_view(record: dict, sig_valid: bool) -> bytes:
         .gis .infonote{{background:var(--paper-deep);border-left:4px solid var(--stamp);padding:12px 16px;font-size:13.5px;color:var(--ink-soft);margin-bottom:14px}}
         .gis .village-warn{{background:rgba(169,106,31,.1);border-left:4px solid var(--amber);padding:10px 14px;font-size:13px;color:var(--amber);margin-bottom:14px}}
         .gis .src-note{{font-family:var(--type);font-size:11.5px;color:var(--ink-soft);font-style:italic;margin-bottom:16px}}
-        .gis .map-grid{{display:grid;grid-template-columns:1.2fr .8fr;gap:20px;align-items:start}}
-        @media(max-width:900px){{.gis .map-grid{{grid-template-columns:1fr}}}}
-        .gis #gis-map{{width:100%;height:380px;border:1.5px solid var(--rule);background:var(--paper-deep);z-index:1}}
+        .gis .map-grid{{display:block}}
+        .gis #gis-map{{width:100%;height:400px;border:1.5px solid var(--rule);background:var(--paper-deep);z-index:1}}
         .gis .legend{{font-size:12px;background:var(--card);border:1px solid var(--rule);padding:10px 14px;margin-top:10px;display:flex;flex-wrap:wrap;gap:16px;align-items:center}}
         .gis .legend .sw{{display:inline-block;width:14px;height:14px;border-radius:3px;margin-right:6px;vertical-align:-2px}}
         .gis .legend .lbl{{font-weight:600;color:var(--ink)}}
         .gis .coords{{font-family:var(--type);font-size:11.5px;color:var(--ink-soft);margin-top:8px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}}
-        .gis .metric{{background:var(--card);border:1px solid var(--rule);padding:16px;margin-bottom:14px}}
-        .gis .metric h4{{font-family:var(--type);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--stamp);margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid var(--rule-soft)}}
-        .gis .metric p{{font-size:13px;line-height:1.6;color:var(--ink-soft);margin:0 0 6px}}
-        .gis .metric p b{{color:var(--ink)}}
-        .gis .metric .disclaimer{{font-family:var(--type);font-size:11px;color:var(--amber);background:rgba(169,106,31,.1);border:1px solid rgba(169,106,31,.3);padding:8px;margin-top:8px;font-style:italic}}
-        .gis .metric .quiet{{font-family:var(--type);font-size:11px;color:var(--ink-soft);background:var(--paper);border:1px solid var(--rule-soft);padding:8px;font-style:italic;margin-top:8px}}
       </style>
     </head>
     <body>
@@ -2260,7 +2321,7 @@ def render_verification_view(record: dict, sig_valid: bool) -> bytes:
       <div class="reg-bar">
         <a class="brand" href="/">
           <b>OneBhoomi</b>
-          <span>वनभूमि &nbsp;·&nbsp; public verification</span>
+          <span>public verification</span>
         </a>
         <div style="display:flex; align-items:center; gap:10px;">
           <div class="lang-picker" title="Change Language">
@@ -2306,9 +2367,6 @@ def render_verification_view(record: dict, sig_valid: bool) -> bytes:
         <div class="fact"><b>Parties</b><ul>{parties_rows}</ul></div>
         <div class="fact"><b>Document Date</b><span class="v">{html.escape(payload_data.get('document_date') or '')}</span></div>
         <div class="fact"><b>Execution Date</b><span class="v">{html.escape(payload_data.get('execution_date') or '')}</span></div>
-
-        <p class="crypto-h">Digital Signature Seal</p>
-        <div class="sigbox">{html.escape(record.get('signature', 'None'))}</div>
       </div>
     </section>
 

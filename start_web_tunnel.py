@@ -10,10 +10,25 @@ BASE_DIR = Path(__file__).resolve().parent
 TXT_PATH = BASE_DIR / "web_tunnel_url.txt"
 PORT = int(os.environ.get("PORT", 8001))
 
+def find_cloudflared() -> str:
+    import shutil
+    candidates = [
+        BASE_DIR / "cloudflared.exe",
+        BASE_DIR / "scratch" / "cloudflared.exe",
+        BASE_DIR / "cloudflared",
+        shutil.which("cloudflared.exe"),
+        shutil.which("cloudflared"),
+    ]
+    for cand in candidates:
+        if cand and Path(cand).exists():
+            return str(cand)
+    return "cloudflared"
+
 def main():
-    print("Starting Cloudflare Public Tunnel for Web Server (port 8001)...")
+    cf_bin = find_cloudflared()
+    print(f"Starting Cloudflare Public Tunnel for Web Server (port {PORT}) using {cf_bin}...")
     proc = subprocess.Popen(
-        ["cloudflared", "tunnel", "--url", f"http://127.0.0.1:{PORT}", "--no-autoupdate"],
+        [cf_bin, "tunnel", "--url", f"http://127.0.0.1:{PORT}", "--no-autoupdate"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,

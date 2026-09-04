@@ -20,12 +20,29 @@ from urllib.parse import urlparse
 
 import requests
 
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 BASE_DIR = Path(__file__).resolve().parent
 COLAB_TXT_PATH = BASE_DIR / "colab_url.txt"
 WEB_APP_PY = BASE_DIR / "web_app.py"
 PORT = int(os.environ.get("PORT", 8001))
-VENV_PYTHON = BASE_DIR / ".venv" / "bin" / "python3"
-PYTHON_BIN = str(VENV_PYTHON) if VENV_PYTHON.exists() else sys.executable
+
+venv_candidates = [
+    BASE_DIR / ".venv" / "Scripts" / "python.exe",
+    BASE_DIR / ".venv" / "bin" / "python3",
+    BASE_DIR / ".venv" / "bin" / "python",
+]
+VENV_PYTHON = next((p for p in venv_candidates if p.exists()), None)
+PYTHON_BIN = str(VENV_PYTHON) if VENV_PYTHON else sys.executable
 
 
 def extract_url(text: str) -> str:
@@ -53,25 +70,69 @@ def check_remote_ocr(url: str, timeout: int = 5) -> dict:
 
 def get_running_server_pids() -> list[int]:
     pids = []
+    my_pid = os.getpid()
+
+    # 1. Cross-platform using psutil if available
     try:
-        res = subprocess.run(["lsof", "-t", f"-i:{PORT}"], capture_output=True, text=True)
-        if res.returncode == 0 and res.stdout.strip():
-            for line in res.stdout.strip().splitlines():
-                if line.isdigit():
-                    pids.append(int(line))
+        import psutil
+        for conn in psutil.net_connections(kind="inet"):
+            if conn.laddr and conn.laddr.port == PORT:
+                if conn.pid and conn.pid != my_pid and conn.pid not in pids:
+                    pids.append(conn.pid)
+        for proc in psutil.process_iter(["pid", "name", "cmdline"]):
+            try:
+                cmdline = proc.info.get("cmdline") or []
+                cmdline_str = " ".join(cmdline).lower()
+                if "web_app.py" in cmdline_str and proc.info["pid"] != my_pid:
+                    if proc.info["pid"] not in pids:
+                        pids.append(proc.info["pid"])
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+        if pids:
+            return pids
     except Exception:
         pass
 
-    try:
-        res = subprocess.run(["pgrep", "-f", "web_app.py"], capture_output=True, text=True)
-        if res.returncode == 0 and res.stdout.strip():
-            for line in res.stdout.strip().splitlines():
-                if line.isdigit():
-                    p = int(line)
-                    if p not in pids and p != os.getpid():
-                        pids.append(p)
-    except Exception:
-        pass
+    # 2. Windows fallback
+    if sys.platform == "win32":
+        try:
+            res = subprocess.run(["netstat", "-ano", "-p", "tcp"], capture_output=True, text=True)
+            if res.returncode == 0:
+                for line in res.stdout.splitlines():
+                    parts = line.strip().split()
+                    if len(parts) >= 5 and parts[0].upper() == "TCP":
+                        local_addr = parts[1]
+                        state = parts[3]
+                        pid_str = parts[4]
+                        if local_addr.endswith(f":{PORT}") and state.upper() in ("LISTENING", "ESTABLISHED") and pid_str.isdigit():
+                            p = int(pid_str)
+                            if p not in pids and p != my_pid:
+                                pids.append(p)
+        except Exception:
+            pass
+    else:
+        # 3. Unix fallback
+        try:
+            res = subprocess.run(["lsof", "-t", f"-i:{PORT}"], capture_output=True, text=True)
+            if res.returncode == 0 and res.stdout.strip():
+                for line in res.stdout.strip().splitlines():
+                    if line.isdigit():
+                        p = int(line)
+                        if p not in pids and p != my_pid:
+                            pids.append(p)
+        except Exception:
+            pass
+
+        try:
+            res = subprocess.run(["pgrep", "-f", "web_app.py"], capture_output=True, text=True)
+            if res.returncode == 0 and res.stdout.strip():
+                for line in res.stdout.strip().splitlines():
+                    if line.isdigit():
+                        p = int(line)
+                        if p not in pids and p != my_pid:
+                            pids.append(p)
+        except Exception:
+            pass
 
     return pids
 
@@ -80,7 +141,23 @@ def stop_server() -> None:
     pids = get_running_server_pids()
     for pid in pids:
         try:
-            os.kill(pid, signal.SIGTERM)
+            if sys.platform == "win32":
+                killed = False
+                try:
+                    import psutil
+                    proc = psutil.Process(pid)
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=2)
+                    except psutil.TimeoutExpired:
+                        proc.kill()
+                    killed = True
+                except Exception:
+                    pass
+                if not killed:
+                    subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
+            else:
+                os.kill(pid, signal.SIGTERM)
         except ProcessLookupError:
             pass
         except Exception as e:
@@ -91,13 +168,21 @@ def stop_server() -> None:
 
 def start_server() -> subprocess.Popen:
     log_file = BASE_DIR / "server.log"
-    out_f = open(log_file, "a")
+    out_f = open(log_file, "a", encoding="utf-8", errors="replace")
+    kwargs = {
+        "cwd": str(BASE_DIR),
+        "stdout": out_f,
+        "stderr": out_f,
+    }
+    if sys.platform == "win32":
+        # 0x00000008 DETACHED_PROCESS + 0x00000200 CREATE_NEW_PROCESS_GROUP
+        kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | 0x00000008
+    else:
+        kwargs["start_new_session"] = True
+
     proc = subprocess.Popen(
         [PYTHON_BIN, "-u", str(WEB_APP_PY)],
-        cwd=str(BASE_DIR),
-        stdout=out_f,
-        stderr=out_f,
-        start_new_session=True,
+        **kwargs,
     )
     return proc
 
