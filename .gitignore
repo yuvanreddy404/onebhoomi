@@ -8,6 +8,7 @@ __pycache__/
 
 # Local configuration / outputs
 colab_url.txt
+web_tunnel_url.txt
 land_document_output.json
 *.log
 

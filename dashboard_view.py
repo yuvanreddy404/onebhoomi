@@ -7,7 +7,7 @@ Features:
   - 4 Executive KPI Cards
   - Full-width Master Ruled Deed Register with live search & filtering
   - Dedicated New Scan & Document Intake workspace with persistent sidebar
-  - MUHAR official legal paper styling (Fraunces, Archivo, Courier Prime)
+  - OneBhoomi official legal paper styling (Fraunces, Archivo, Courier Prime)
 """
 
 from __future__ import annotations
@@ -38,9 +38,77 @@ DASHBOARD_CSS = """
       --green-deep:#1C4A36; --amber:#A96A1F; --gold:#C9A227;
       --rule:#C9BC9F; --rule-soft:#DCD2B8; --card:#FFFDF6;
       --border:#D4C8AE; --border-dark:#221D17;
-      --serif:"Fraunces",Georgia,serif;
-      --type:"Courier Prime","Courier New",monospace;
-      --sans:"Archivo",system-ui,sans-serif;
+      --serif:"Fraunces", "Noto Serif Devanagari", "Noto Serif Telugu", "Noto Serif Kannada", "Noto Serif Tamil", Georgia, serif;
+      --type:"Courier Prime", "Noto Sans Devanagari", "Noto Sans Telugu", "Noto Sans Kannada", "Noto Sans Tamil", "Courier New", monospace;
+      --sans:"Archivo", "Noto Sans Devanagari", "Noto Sans Telugu", "Noto Sans Kannada", "Noto Sans Tamil", system-ui, sans-serif;
+    }
+
+    /* Header Language Picker */
+    .lang-picker {
+      display: inline-flex;
+      align-items: center;
+      background: var(--paper-deep);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      padding: 3px 8px;
+      margin-right: 12px;
+      transition: border-color .15s ease, box-shadow .15s ease;
+      position: relative;
+    }
+    .lang-picker:focus-within, .lang-picker:hover {
+      border-color: var(--stamp);
+      box-shadow: 0 0 0 2px rgba(166,25,60,0.12);
+    }
+    .lang-dropdown,
+    .lang-picker select,
+    select.lang-dropdown {
+      background: transparent !important;
+      border: none !important;
+      outline: none !important;
+      box-shadow: none !important;
+      -webkit-appearance: none !important;
+      -moz-appearance: none !important;
+      appearance: none !important;
+      font-family: var(--type) !important;
+      font-size: 11.5px !important;
+      color: var(--ink) !important;
+      font-weight: 700 !important;
+      letter-spacing: .5px !important;
+      cursor: pointer !important;
+      padding: 2px 18px 2px 2px !important;
+      margin: 0 !important;
+      width: auto !important;
+      height: auto !important;
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%235A5142' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E") !important;
+      background-repeat: no-repeat !important;
+      background-position: right center !important;
+      background-size: 8px 5px !important;
+    }
+    .lang-dropdown:focus,
+    .lang-dropdown:focus-visible,
+    .lang-dropdown:active,
+    .lang-picker select:focus,
+    .lang-picker select:focus-visible,
+    .lang-picker select:active,
+    select.lang-dropdown:focus,
+    select.lang-dropdown:focus-visible,
+    select.lang-dropdown:active {
+      outline: none !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+    .lang-dropdown option {
+      background: #FFFDF6;
+      color: #221D17;
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 10px;
+    }
+    html[lang="hi"] body, html[lang="hi"] p, html[lang="hi"] span, html[lang="hi"] a { font-family: "Noto Sans Devanagari", var(--sans); }
+    html[lang="te"] body, html[lang="te"] p, html[lang="te"] span, html[lang="te"] a { font-family: "Noto Sans Telugu", var(--sans); }
+    html[lang="kn"] body, html[lang="kn"] p, html[lang="kn"] span, html[lang="kn"] a { font-family: "Noto Sans Kannada", var(--sans); }
+    html[lang="ta"] body, html[lang="ta"] p, html[lang="ta"] span, html[lang="ta"] a { font-family: "Noto Sans Tamil", var(--sans); }
     }
     *{margin:0;padding:0;box-sizing:border-box}
     html{scroll-behavior:smooth}
@@ -77,25 +145,25 @@ DASHBOARD_CSS = """
       .app-layout{flex-direction:column}
     }
 
-    .sidebar-top{padding:24px 20px 16px}
+    .sidebar-top{padding:24px 16px 16px;text-align:left}
     .brand-box{
       display:flex;flex-direction:column;gap:3px;text-decoration:none;color:var(--ink);
-      padding-bottom:18px;border-bottom:2px double var(--rule);margin-bottom:22px;
+      padding-bottom:18px;border-bottom:2px double var(--rule);margin-bottom:22px;text-align:left;
     }
-    .brand-box b{font-family:var(--serif);font-weight:900;font-size:26px;letter-spacing:.04em;line-height:1}
-    .brand-box span{font-family:var(--type);font-size:10.5px;letter-spacing:.18em;color:var(--stamp);text-transform:uppercase}
+    .brand-box b{font-family:var(--serif);font-weight:900;font-size:26px;letter-spacing:.04em;line-height:1;text-align:left}
+    .brand-box span{font-family:var(--type);font-size:10.5px;letter-spacing:.18em;color:var(--stamp);text-transform:uppercase;text-align:left}
 
     .nav-label{
       font-family:var(--type);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
-      color:var(--ink-soft);padding:0 8px;margin-bottom:8px;font-weight:700;
+      color:var(--ink-soft);padding:0 8px;margin-bottom:10px;font-weight:700;text-align:left;
     }
 
-    .nav-menu{display:flex;flex-direction:column;gap:3px;list-style:none}
+    .nav-menu{display:flex;flex-direction:column;gap:3px;list-style:none;padding:0;margin:0}
     .nav-menu li a{
       display:flex;align-items:center;justify-content:space-between;
-      padding:9px 12px;border-radius:2px;text-decoration:none;color:var(--ink);
+      padding:10px 10px 10px 8px;border-radius:2px;text-decoration:none;color:var(--ink);
       font-size:13.5px;font-weight:600;transition:all .15s ease;
-      border-left:3px solid transparent;
+      border-left:3px solid transparent;text-align:left;
     }
     .nav-menu li a:hover{
       background:var(--paper);border-left-color:var(--rule);color:var(--ink);
@@ -103,8 +171,7 @@ DASHBOARD_CSS = """
     .nav-menu li a.active{
       background:var(--paper-deep);border-left-color:var(--stamp);color:var(--stamp);font-weight:700;
     }
-    .nav-link-left{display:flex;align-items:center;gap:10px}
-    .nav-icon{font-size:15px;width:18px;text-align:center}
+    .nav-link-left{display:flex;align-items:center;gap:0;text-align:left;justify-content:flex-start}
 
     .nav-badge{
       font-family:var(--type);font-size:10px;padding:2px 6px;border-radius:2px;
@@ -169,6 +236,7 @@ DASHBOARD_CSS = """
     /* 4-Grid KPI Cards */
     .kpi-grid{
       display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:26px;
+      align-items:stretch;
     }
     @media(max-width:1120px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
     @media(max-width:560px){.kpi-grid{grid-template-columns:1fr}}
@@ -177,6 +245,7 @@ DASHBOARD_CSS = """
       background:var(--card);border:1.5px solid var(--border);border-radius:2px;
       padding:20px 22px;position:relative;box-shadow:2px 2px 0 rgba(0,0,0,.025);
       transition:transform .15s ease, border-color .15s ease;
+      display:flex;flex-direction:column;justify-content:space-between;height:100%;box-sizing:border-box;
     }
     .kpi-card:hover{border-color:var(--ink);transform:translateY(-2px)}
     .kpi-label{
@@ -197,6 +266,7 @@ DASHBOARD_CSS = """
       background:#FFF9E6;border:1.5px solid #F0C36D;border-left:4px solid var(--amber);
       border-radius:2px;padding:12px 18px;margin-bottom:24px;
       display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+      width:100%;box-sizing:border-box;
     }
     .notice-info{display:flex;align-items:center;gap:12px}
     .notice-icon{font-size:20px}
@@ -208,12 +278,14 @@ DASHBOARD_CSS = """
     /* ---------------------------------------------------- */
     .charts-grid{
       display:grid;grid-template-columns:1.6fr 1fr;gap:20px;margin-bottom:26px;
+      align-items:stretch;
     }
     @media(max-width:1080px){.charts-grid{grid-template-columns:1fr}}
 
     .chart-card{
       background:var(--card);border:1.5px solid var(--border);border-radius:2px;
-      padding:22px;display:flex;flex-direction:column;box-shadow:2px 2px 0 rgba(0,0,0,.025);
+      padding:22px;display:flex;flex-direction:column;justify-content:space-between;
+      height:100%;box-sizing:border-box;box-shadow:2px 2px 0 rgba(0,0,0,.025);
     }
     .chart-header{
       display:flex;justify-content:space-between;align-items:baseline;
@@ -258,30 +330,33 @@ DASHBOARD_CSS = """
     /* ---------------------------------------------------- */
     .ledger-section{
       background:var(--card);border:1.5px solid var(--ink);border-radius:2px;
-      box-shadow:3px 3px 0 rgba(0,0,0,.04);margin-bottom:26px;
+      box-shadow:3px 3px 0 rgba(0,0,0,.04);margin-bottom:26px;width:100%;box-sizing:border-box;
     }
     .ledger-toolbar{
-      padding:14px 22px;background:var(--paper-deep);border-bottom:1.5px solid var(--ink);
-      display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+      padding:12px 18px;background:var(--paper-deep);border-bottom:1.5px solid var(--ink);
+      display:flex;justify-content:space-between;align-items:center;gap:14px;
+      width:100%;box-sizing:border-box;flex-wrap:nowrap;
     }
-    .toolbar-left{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+    .toolbar-left{display:flex;align-items:center;gap:12px;flex-shrink:1;min-width:0}
     .ledger-head-title{
-      font-family:var(--serif);font-size:20px;font-weight:700;color:var(--ink);
+      font-family:var(--serif);font-size:18px;font-weight:700;color:var(--ink);
+      white-space:nowrap;flex-shrink:0;
     }
-    .search-wrap{position:relative}
+    .search-wrap{position:relative;flex-shrink:1;min-width:130px;max-width:230px;width:100%}
     .search-input{
-      font-family:var(--sans);font-size:13px;padding:7px 12px 7px 30px;
+      font-family:var(--sans);font-size:12.5px;padding:6px 10px 6px 28px;
       border:1.5px solid var(--rule);border-radius:2px;background:var(--paper);
-      color:var(--ink);width:280px;transition:all .15s ease;outline:none;
+      color:var(--ink);width:100%;box-sizing:border-box;transition:all .15s ease;outline:none;
     }
-    .search-input:focus{border-color:var(--stamp);width:330px;background:var(--card)}
-    .search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--ink-soft);font-size:12px}
+    .search-input:focus{border-color:var(--stamp);background:var(--card)}
+    .search-icon{position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--ink-soft);font-size:12px}
 
-    .toolbar-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-    .filter-tabs{display:flex;gap:6px;align-items:center}
+    .toolbar-right{display:flex;align-items:center;gap:8px;flex-shrink:0;white-space:nowrap;flex-wrap:nowrap}
+    .filter-tabs{display:flex;gap:4px;align-items:center;flex-wrap:nowrap}
     .tab-btn{
-      font-family:var(--type);font-size:11px;padding:6px 12px;border:1px solid var(--rule);
-      background:var(--paper);color:var(--ink-soft);border-radius:2px;cursor:pointer;transition:all .15s ease;
+      font-family:var(--type);font-size:10.5px;padding:5px 9px;border:1px solid var(--rule);
+      background:var(--paper);color:var(--ink-soft);border-radius:2px;cursor:pointer;
+      transition:all .15s ease;white-space:nowrap;flex-shrink:0;
     }
     .tab-btn:hover{color:var(--ink);border-color:var(--ink)}
     .tab-btn.active{
@@ -604,6 +679,70 @@ DASHBOARD_JS = """
       loadingOverlay.style.display = 'flex';
     });
   }
+
+  // Language switcher for Dashboard
+  const DASH_I18N = {"en": {"dash_sidebar_brand": "OneBhoomi · REGISTRY DESK", "nav_main_menu": "Main Menu", "nav_dash": "Dashboard", "nav_ops_dash": "Operations Dashboard", "nav_new_scan": "New Scan & Intake", "nav_new_scan_link": "New Document Scan", "badge_desk01": "Desk 01", "nav_master_reg": "Master Deed Register", "nav_clerk_queue": "Clerk Review Queue", "nav_verified_certs": "Verified Certificates", "lbl_air_gapped": "AIR-GAPPED & SECURE", "lbl_rsa_stat": "RSA-PSS 2048:", "lbl_active": "Active", "lbl_worker": "Worker:", "btn_new_scan": "+ New Document Scan", "btn_return_dash": "← Return to Dashboard", "lbl_day_book": "DAY BOOK DATE:", "lbl_register_desk": "REGISTER DESK 01 ·", "dash_h1": "Registry Operations & <em>Analytics</em>", "dash_tagline": "Complete offline day book of land records, human-in-the-loop clerk reviews, and cryptographic digital seals.", "kpi_total": "Total on File", "kpi_total_sub": "Total land deeds recorded in offline registry", "kpi_sealed": "Sealed & Certified", "kpi_sealed_sub": "certification rate · RSA-PSS signed", "kpi_review": "Clerk Review Queue", "kpi_review_sub": "Awaiting clerk verification & approval", "kpi_noncert": "Non-Certified", "kpi_noncert_sub": "Rejected or anomalous scan records", "banner_title": "Clerk Review Action Required:", "banner_prefix": "There are", "banner_suffix": "land record(s) awaiting verification against scanned evidence and officer digital signing.", "btn_open_next": "Open Next Record", "chart_vel_title": "Registration Velocity & Sealing Throughput", "chart_vel_meta": "Timeline intake volume vs verified cryptographic certifications", "chart_total_intake": "Total Intake", "chart_sealed_on_file": "Sealed on File", "chart_doc_class": "Document Classification", "chart_doc_meta": "Distribution of legal record deed categories", "chart_gis_lbl": "GIS Resolved:", "chart_sale_deeds": "Sale Deeds", "chart_agreements_gpa": "Agreements / GPA", "chart_other_records": "Other Records", "chart_spatial_match": "Telangana (TGRAC) & Karnataka Spatial Match", "chart_resolved": "Resolved", "reg_title": "Master Land Deed Register", "search_placeholder": "Search by Doc #, Village, Party, Survey...", "tab_all": "All", "tab_sealed": "Sealed", "tab_pending": "Pending", "tab_rejected": "Rejected", "btn_scan_new_deed": "+ Scan New Deed", "th_sl": "SL.", "th_received": "RECEIVED", "th_doc_no": "DOCUMENT & NO.", "th_parties": "PARTIES", "th_location": "LOCATION", "th_survey": "SURVEY DESIGNATION", "th_stamp": "STAMP DUTY", "th_status": "STATUS", "th_actions": "ACTIONS", "badge_approved": "Sealed & Certified", "badge_rejected": "Rejected on Record", "badge_under_review": "Needs Review", "badge_extracted": "Pending Check", "badge_ready_for_approval": "Ready for Seal", "badge_pass": "Checks Passed", "badge_fail": "Checks Failed", "btn_review_console": "Review Console", "btn_cert": "✓ Certificate", "lbl_fingerprint": "RSA-PSS 2048 Fingerprint:", "btn_copy": "COPY", "lbl_spatial_index": "Spatial Index:", "lbl_key_store": "Key Store:", "foot_console_title": "OneBhoomi Registry Console · Standalone Land Document Extraction & Digital Seal System", "foot_air_gapped_info": "100% Air-Gapped & Immutable · Zero cloud dependencies · Host: localhost", "badge_needs_review": "Needs Review", "Sale Deed": "Sale Deed", "Agreement of Sale-cum-General Power of Attorney": "Agreement of Sale-cum-General Power of Attorney", "Land Record": "Land Record", "Unnumbered": "Unnumbered", "Mandal": "Mandal", "Presently Mulugu District": "Presently Mulugu District", "intake_h1": "New Document Scan & <em>Intake</em>", "intake_title": "Registration & Scan Intake", "dz_main_text": "Drop the document scan copy here, or <span>browse local files</span>", "ocr_engine_title": "OCR Processing Engine", "val_grounding_title": "Validation & Spatial Grounding", "btn_start_extract": "Start Document Extraction →"}, "hi": {"dash_sidebar_brand": "वनभूमि · रजिस्ट्री डेस्क", "nav_main_menu": "मुख्य मेनू", "nav_dash": "डैशबोर्ड", "nav_ops_dash": "परिचालन डैशबोर्ड", "nav_new_scan": "नया स्कैन एवं इनटेक", "nav_new_scan_link": "नया दस्तावेज़ स्कैन", "badge_desk01": "डेस्क 01", "nav_master_reg": "मुख्य विलेख रजिस्टर", "nav_clerk_queue": "क्लर्क समीक्षा कतार", "nav_verified_certs": "प्रमाणित प्रमाणपत्र", "lbl_air_gapped": "सुरक्षित एवं एयर-गैप्ड", "lbl_rsa_stat": "RSA-PSS 2048:", "lbl_active": "सक्रिय", "lbl_worker": "वर्कर:", "btn_new_scan": "+ नया दस्तावेज़ स्कैन", "btn_return_dash": "← डैशबोर्ड पर वापस जाएं", "lbl_day_book": "रोज़नामचा तिथि:", "lbl_register_desk": "रजिस्ट्री डेस्क 01 ·", "dash_h1": "रजिस्ट्री संचालन एवं <em>विश्लेषण</em>", "dash_tagline": "भूमि अभिलेखों का संपूर्ण ऑफ़लाइन रोज़नामचा, मानवीय क्लर्क समीक्षा एवं क्रिप्टोग्राफ़िक डिजिटल मुहर।", "kpi_total": "कुल दर्ज दस्तावेज़", "kpi_total_sub": "ऑफ़लाइन रजिस्ट्री में दर्ज कुल भूमि विलेख", "kpi_sealed": "मुहरबंद एवं प्रमाणित", "kpi_sealed_sub": "प्रमाणीकरण दर · RSA-PSS हस्ताक्षरित", "kpi_review": "क्लर्क समीक्षा कतार", "kpi_review_sub": "क्लर्क सत्यापन एवं अनुमोदन प्रतीक्षित", "kpi_noncert": "गैर-प्रमाणित", "kpi_noncert_sub": "अस्वीकृत या त्रुटिपूर्ण स्कैन रिकॉर्ड", "banner_title": "क्लर्क समीक्षा कार्रवाई आवश्यक:", "banner_prefix": "यहाँ", "banner_suffix": "भूमि रिकॉर्ड साक्ष्य सत्यापन एवं अधिकारी डिजिटल हस्ताक्षर हेतु लंबित हैं।", "btn_open_next": "अगला रिकॉर्ड खोलें", "chart_vel_title": "पंजीकरण गति एवं मुहर प्रवाह", "chart_vel_meta": "दस्तावेज़ प्रवेश मात्रा बनाम सत्यापित डिजिटल प्रमाणीकरण", "chart_total_intake": "कुल प्रवेश", "chart_sealed_on_file": "अभिलेख पर मुहरबंद", "chart_doc_class": "दस्तावेज़ वर्गीकरण", "chart_doc_meta": "कानूनी भूमि विलेख श्रेणियों का वितरण", "chart_gis_lbl": "जीआईएस समाधान:", "chart_sale_deeds": "बिक्री विलेख", "chart_agreements_gpa": "समझौते / जीपीए", "chart_other_records": "अन्य रिकॉर्ड", "chart_spatial_match": "तेलंगाना (TGRAC) एवं कर्नाटक स्थानिक मिलान", "chart_resolved": "समाधानित", "reg_title": "मुख्य भूमि विलेख रजिस्टर", "search_placeholder": "दस्तावेज़ सं., ग्राम, पक्षकार, सर्वे द्वारा खोजें...", "tab_all": "सभी", "tab_sealed": "मुहरबंद", "tab_pending": "लंबित", "tab_rejected": "अस्वीकृत", "btn_scan_new_deed": "+ नया विलेख स्कैन करें", "th_sl": "क्र.", "th_received": "प्राप्ति तिथि", "th_doc_no": "दस्तावेज़ एवं क्रमांक", "th_parties": "पक्षकार", "th_location": "स्थान", "th_survey": "सर्वेक्षण पदनाम", "th_stamp": "स्टाम्प शुल्क", "th_status": "स्थिति", "th_actions": "कार्रवाई", "badge_approved": "मुहरबंद एवं प्रमाणित", "badge_rejected": "अभिलेख पर अस्वीकृत", "badge_under_review": "समीक्षा आवश्यक", "badge_extracted": "जांच लंबित", "badge_ready_for_approval": "मुहर हेतु तैयार", "badge_pass": "सत्यापन सफल", "badge_fail": "सत्यापन विफल", "btn_review_console": "समीक्षा कंसोल", "btn_cert": "✓ प्रमाणपत्र", "lbl_fingerprint": "RSA-PSS 2048 फिंगरप्रिंट:", "btn_copy": "कॉपी", "lbl_spatial_index": "स्थानिक सूचकांक:", "lbl_key_store": "कुंजी भंडार:", "foot_console_title": "वनभूमि रजिस्ट्री कंसोल · स्टैंडअलोन भूमि दस्तावेज़ निष्कर्षण एवं डिजिटल मुहर प्रणाली", "foot_air_gapped_info": "100% एयर-गैप्ड एवं अपरिवर्तनीय · शून्य क्लाउड निर्भरता · होस्ट: localhost", "badge_needs_review": "समीक्षा आवश्यक", "Sale Deed": "बिक्री विलेख", "Agreement of Sale-cum-General Power of Attorney": "बिक्री-सह-जीपीए समझौता", "Land Record": "भूमि रिकॉर्ड", "Unnumbered": "अक्रमांकित", "Mandal": "मंडल", "Presently Mulugu District": "वर्तमान में मुलुगु ज़िला", "intake_h1": "नया दस्तावेज़ स्कैन एवं <em>प्रवेश</em>", "intake_title": "पंजीकरण एवं स्कैन इनटेक", "dz_main_text": "दस्तावेज़ स्कैन प्रति यहाँ छोड़ें, या <span>स्थानीय फ़ाइलें चुनें</span>", "ocr_engine_title": "ओसीआर प्रोसेसिंग इंजन", "val_grounding_title": "सत्यापन एवं स्थानिक जांच", "btn_start_extract": "दस्तावेज़ निष्कर्षण प्रारंभ करें →"}, "te": {"dash_sidebar_brand": "వన్‌భూమి · రిజిస్ట్రీ డెస్క్", "nav_main_menu": "ప్రధాన మెనూ", "nav_dash": "డ్యాష్‌బోర్డ్", "nav_ops_dash": "కార్యకలాపాల డ్యాష్‌బోర్డ్", "nav_new_scan": "కొత్త స్కాన్ & ఇన్‌టేక్", "nav_new_scan_link": "కొత్త దస్తావేజు స్కాన్", "badge_desk01": "డెస్క్ 01", "nav_master_reg": "ప్రధాన దస్తావేజుల రిజిస్టర్", "nav_clerk_queue": "క్లర్క్ సమీక్ష వరుస", "nav_verified_certs": "ధృవీకరించిన సర్టిఫికెట్లు", "lbl_air_gapped": "సురక్షితం & ఎయిర్-గ్యాప్డ్", "lbl_rsa_stat": "RSA-PSS 2048:", "lbl_active": "క్రియాశీలం", "lbl_worker": "వర్కర్:", "btn_new_scan": "+ కొత్త దస్తావేజు స్కాన్", "btn_return_dash": "← డ్యాష్‌బోర్డుకు తిరిగి వెళ్లండి", "lbl_day_book": "రోజువారీ తేది:", "lbl_register_desk": "రిజిస్ట్రీ డెస్క్ 01 ·", "dash_h1": "రిజిస్ట్రీ కార్యకలాపాలు & <em>విశ్లేషణలు</em>", "dash_tagline": "భూ రికార్డుల ఆఫ్‌లైన్ డైలీ బుక్, క్లర్క్ సమీక్ష మరియు క్రిప్టోగ్రాఫిక్ డిజిటల్ సీల్స్.", "kpi_total": "మొత్తం రికార్డులు", "kpi_total_sub": "ఆఫ్‌లైన్ రిజిస్ట్రీలో నమోదు చేసిన మొత్తం దస్తావేజులు", "kpi_sealed": "సీల్ చేసి ధృవీకరించినవి", "kpi_sealed_sub": "ధృవీకరణ శాతం · RSA-PSS సంతకం", "kpi_review": "క్లర్క్ సమీక్ష వరుస", "kpi_review_sub": "క్లర్క్ తనిఖీ మరియు ఆమోదం కోసం వేచివున్నవి", "kpi_noncert": "ధృవీకరించబడనివి", "kpi_noncert_sub": "తిరస్కరించబడిన లేదా లోపభూయిష్ట రికార్డులు", "banner_title": "క్లర్క్ సమీక్ష చర్య అవసరం:", "banner_prefix": "ఇక్కడ", "banner_suffix": "రికార్డులు సాక్ష్యాధారాల తనిఖీ మరియు అధికారి డిజిటల్ సంతకం కోసం వేచి ఉన్నాయి.", "btn_open_next": "తదుపరి రికార్డు తెరవండి", "chart_vel_title": "నమోదు వేగం & ముద్రణ పరిమాణం", "chart_vel_meta": "ఇన్‌టేక్ సంఖ్య మరియు డిజిటల్ సర్టిఫికేషన్ల నిష్పత్తి", "chart_total_intake": "మొత్తం స్వీకరణ", "chart_sealed_on_file": "ఫైల్‌లో ముద్రించబడినవి", "chart_doc_class": "దస్తావేజుల వర్గీకరణ", "chart_doc_meta": "చట్టపరమైన రిజిస్టర్ దస్తావేజుల వివరాలు", "chart_gis_lbl": "GIS నిర్ధారణ:", "chart_sale_deeds": "సేల్ డీడ్‌లు", "chart_agreements_gpa": "ఒప్పందాలు / GPA", "chart_other_records": "ఇతర రికార్డులు", "chart_spatial_match": "తెలంగాణ (TGRAC) & కర్ణాటక భౌగోళిక సరిపోలిక", "chart_resolved": "సరిచూడబడింది", "reg_title": "ప్రధాన భూ దస్తావేజుల రిజిస్టర్", "search_placeholder": "పత్రం నం., గ్రామం, పార్టీ, సర్వే ద్వారా శోధించండి...", "tab_all": "అన్నీ", "tab_sealed": "సీల్ చేసినవి", "tab_pending": "పెండింగ్", "tab_rejected": "తిరస్కరించినవి", "btn_scan_new_deed": "+ కొత్త దస్తావేజు స్కాన్ చేయండి", "th_sl": "వ.సంఖ్య", "th_received": "స్వీకరించిన తేదీ", "th_doc_no": "పత్రం & సంఖ్య", "th_parties": "పార్టీలు", "th_location": "ప్రదేశం", "th_survey": "సర్వే హోదా", "th_stamp": "స్టాంప్ డ్యూటీ", "th_status": "స్థితి", "th_actions": "చర్యలు", "badge_approved": "సీల్ చేసి ధృవీకరించబడింది", "badge_rejected": "రికార్డులో తిరస్కరించబడింది", "badge_under_review": "సమీక్ష అవసరం", "badge_extracted": "తనిఖీ పెండింగ్", "badge_ready_for_approval": "ముద్రకు సిద్ధం", "badge_pass": "తనిఖీలు విజయవంతం", "badge_fail": "తనిఖీలు విఫలం", "btn_review_console": "సమీక్ష కన్సోల్", "btn_cert": "✓ సర్టిఫికేట్", "lbl_fingerprint": "RSA-PSS 2048 వేలిముద్ర:", "btn_copy": "కాపీ", "lbl_spatial_index": "భౌగోళిక సూచిక:", "lbl_key_store": "కీ నిల్వ:", "foot_console_title": "వన్‌భూమి రిజిస్ట్రీ కన్సోల్ · భూ దస్తావేజు సేకరణ మరియు డిజిటల్ సీల్ వ్యవస్థ", "foot_air_gapped_info": "100% ఎయిర్-గ్యాప్డ్ & మార్చలేనిది · క్లౌడ్ అవసరం లేదు · హోస్ట్: localhost", "badge_needs_review": "సమీక్ష అవసరం", "Sale Deed": "సేల్ డీడ్", "Agreement of Sale-cum-General Power of Attorney": "సేల్-కమ్-GPA ఒప్పందం", "Land Record": "భూ రికార్డు", "Unnumbered": "సంఖ్య లేదు", "Mandal": "మండలం", "Presently Mulugu District": "ప్రస్తుతం ములుగు జిల్లా", "intake_h1": "కొత్త దస్తావేజు స్కాన్ & <em>ఇన్‌టేక్</em>", "intake_title": "రిజిస్ట్రేషన్ & స్కాన్ ఇన్‌టేక్", "dz_main_text": "స్కాన్ చేసిన పత్రాన్ని ఇక్కడ వేయండి, లేదా <span>ఫైళ్లను ఎంచుకోండి</span>", "ocr_engine_title": "OCR ప్రాసెసింగ్ ఇంజిన్", "val_grounding_title": "ధృవీకరణ & భౌగోళిక తనిఖీ", "btn_start_extract": "సమాచార సేకరణను ప్రారంభించండి →"}, "kn": {"dash_sidebar_brand": "ವನ್‌ಭೂಮಿ · ನೋಂದಣಿ ಡೆಸ್ಕ್", "nav_main_menu": "ಮುಖ್ಯ ಮೆನು", "nav_dash": "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್", "nav_ops_dash": "ಕಾರ್ಯಾಚರಣೆಗಳ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್", "nav_new_scan": "ಹೊಸ ಸ್ಕ್ಯಾನ್ & ಸ್ವೀಕಾರ", "nav_new_scan_link": "ಹೊಸ ದಾಖಲೆ ಸ್ಕ್ಯಾನ್", "badge_desk01": "ಡೆಸ್ಕ್ 01", "nav_master_reg": "ಮುಖ್ಯ ಪತ್ರಗಳ ನೋಂದಣಿ", "nav_clerk_queue": "ಗುಮಾಸ್ತರ ಪರಿಶೀಲನಾ ಸಾಲು", "nav_verified_certs": "ದೃಢೀಕೃತ ಪ್ರಮಾಣಪತ್ರಗಳು", "lbl_air_gapped": "ಸುರಕ್ಷಿತ & ಏರ್-ಗ್ಯಾಪ್ಡ್", "lbl_rsa_stat": "RSA-PSS 2048:", "lbl_active": "ಸಕ್ರಿಯ", "lbl_worker": "ವರ್ಕರ್:", "btn_new_scan": "+ ಹೊಸ ದಾಖಲೆ ಸ್ಕ್ಯಾನ್", "btn_return_dash": "← ಡ್ಯಾಶ್‌ಬೋರ್ಡ್‌ಗೆ ಹಿಂತಿರುಗಿ", "lbl_day_book": "ದಿನಚರಿ ದಿನಾಂಕ:", "lbl_register_desk": "ನೋಂದಣಿ ಡೆಸ್ಕ್ 01 ·", "dash_h1": "ನೋಂದಣಿ ಕಾರ್ಯಾಚರಣೆಗಳು & <em>ವಿಶ್ಲೇಷಣೆ</em>", "dash_tagline": "ಭೂ ದಾಖಲೆಗಳ ಸಂಪೂರ್ಣ ಆಫ್‌ಲೈನ್ ದಿನಚರಿ, ಸಿಬ್ಬಂದಿ ಪರಿಶೀಲನೆ ಮತ್ತು ಡಿಜಿಟಲ್ ಮುದ್ರೆಗಳು.", "kpi_total": "ಒಟ್ಟು ದಾಖಲೆಗಳು", "kpi_total_sub": "ಆಫ್‌ಲೈನ್ ನೋಂದಣಿಯಲ್ಲಿ ದಾಖಲಾದ ಒಟ್ಟು ಭೂ ದಾಖಲೆಗಳು", "kpi_sealed": "ಮುದ್ರೆ ಹಾಕಿ ಪ್ರಮಾಣೀಕರಿಸಿದವು", "kpi_sealed_sub": "ಪ್ರಮಾಣೀಕರಣ ದರ · RSA-PSS ಸಹಿ ಮಾಡಲಾಗಿದೆ", "kpi_review": "ಸಿಬ್ಬಂದಿ ಪರಿಶೀಲನಾ ಸಾಲು", "kpi_review_sub": "ಸಿಬ್ಬಂದಿ ಪರಿಶೀಲನೆ ಮತ್ತು ಅನುಮೋದನೆಗೆ ಬಾಕಿ", "kpi_noncert": "ಪ್ರಮಾಣೀಕರಿಸದ ದಾಖಲೆಗಳು", "kpi_noncert_sub": "ತಿರಸ್ಕರಿಸಲಾದ ಅಥವಾ ದೋಷಪೂರಿತ ದಾಖಲೆಗಳು", "banner_title": "ಸಿಬ್ಬಂದಿ ಪರಿಶೀಲನೆ ಅಗತ್ಯವಿದೆ:", "banner_prefix": "ಇಲ್ಲಿ", "banner_suffix": "ದಾಖಲೆಗಳು ಸಾಕ್ಷ್ಯ ಪರಿಶೀಲನೆ ಮತ್ತು ಅಧಿಕಾರಿಯ ಡಿಜಿಟಲ್ ಸಹಿಗಾಗಿ ಕಾಯುತ್ತಿವೆ.", "btn_open_next": "ಮುಂದಿನ ದಾಖಲೆ ತೆರೆಯಿರಿ", "chart_vel_title": "ನೋಂದಣಿ ವೇಗ ಮತ್ತು ಮುದ್ರಣ ಪ್ರಮಾಣ", "chart_vel_meta": "ದಾಖಲೆ ಸ್ವೀಕಾರ ಪ್ರಮಾಣ ಮತ್ತು ಡಿಜಿಟಲ್ ದೃಢೀಕರಣಗಳು", "chart_total_intake": "ಒಟ್ಟು ಸ್ವೀಕಾರ", "chart_sealed_on_file": "ದಾಖಲೆಯಲ್ಲಿ ಮುದ್ರೆ ಹಾಕಿದವು", "chart_doc_class": "ದಾಖಲೆಗಳ ವರ್ಗೀಕರಣ", "chart_doc_meta": "ಕಾನೂನು ದಾಖಲೆಗಳ ವರ್ಗಗಳ ವಿವರ", "chart_gis_lbl": "GIS ಪರಿಶೀಲನೆ:", "chart_sale_deeds": "ಮಾರಾಟ ಪತ್ರಗಳು", "chart_agreements_gpa": "ಒಪ್ಪಂದಗಳು / GPA", "chart_other_records": "ಇತರ ದಾಖಲೆಗಳು", "chart_spatial_match": "ತೆಲಂಗಾಣ (TGRAC) & ಕರ್ನಾಟಕ ಭೌಗೋಳಿಕ ತಾಳೆ", "chart_resolved": "ಪರಿಹರಿಸಲಾಗಿದೆ", "reg_title": "ಮುಖ್ಯ ಭೂ ದಾಖಲೆಗಳ ನೋಂದಣಿ", "search_placeholder": "ದಾಖಲೆ ಸಂ., ಗ್ರಾಮ, ಪಕ್ಷಗಾರ, ಸರ್ವೇ ಮೂಲಕ ಹುಡುಕಿ...", "tab_all": "ಎಲ್ಲವೂ", "tab_sealed": "ಮುದ್ರೆ ಹಾಕಿದವು", "tab_pending": "ಬಾಕಿ", "tab_rejected": "ತಿರಸ್ಕರಿಸಿದವು", "btn_scan_new_deed": "+ ಹೊಸ ದಾಖಲೆ ಸ್ಕ್ಯಾನ್ ಮಾಡಿ", "th_sl": "ಕ್ರ.ಸಂ.", "th_received": "ಸ್ವೀಕರಿಸಿದ ದಿನಾಂಕ", "th_doc_no": "ದಾಖಲೆ ಮತ್ತು ಸಂಖ್ಯೆ", "th_parties": "ಪಕ್ಷಗಳು", "th_location": "ಸ್ಥಳ", "th_survey": "ಸರ್ವೇ ವಿವರ", "th_stamp": "ಮುದ್ರಾಂಕ ಶುಲ್ಕ", "th_status": "ಸ್ಥಿತಿ", "th_actions": "ಕ್ರಮಗಳು", "badge_approved": "ಮುದ್ರೆ ಹಾಕಿ ಪ್ರಮಾಣೀಕರಿಸಲಾಗಿದೆ", "badge_rejected": "ದಾಖಲೆಯಲ್ಲಿ ತಿರಸ್ಕರಿಸಲಾಗಿದೆ", "badge_under_review": "ಪರಿಶೀಲನೆ ಅಗತ್ಯವಿದೆ", "badge_extracted": "ಪರಿಶೀಲನೆ ಬಾಕಿ", "badge_ready_for_approval": "ಮುದ್ರೆಗೆ ಸಿದ್ಧ", "badge_pass": "ಪರಿಶೀಲನೆ ಯಶಸ್ವಿ", "badge_fail": "ಪರಿಶೀಲನೆ ವಿಫಲ", "btn_review_console": "ಪರಿಶೀಲನಾ ಕನ್ಸೋಲ್", "btn_cert": "✓ ಪ್ರಮಾಣಪತ್ರ", "lbl_fingerprint": "RSA-PSS 2048 ಫಿಂಗರ್‌ಪ್ರಿಂಟ್:", "btn_copy": "ಕಾಪಿ", "lbl_spatial_index": "ಭೌಗೋಳಿಕ ಸೂಚ್ಯಂಕ:", "lbl_key_store": "ಕೀ ಸಂಗ್ರಹ:", "foot_console_title": "ವನ್‌ಭೂಮಿ ನೋಂದಣಿ ಕನ್ಸೋಲ್ · ಭೂ ದಾಖಲೆ ಮಾಹಿತಿ ಮತ್ತು ಡಿಜಿಟಲ್ ಮುದ್ರೆ ವ್ಯವಸ್ಥೆ", "foot_air_gapped_info": "100% ಏರ್-ಗ್ಯಾಪ್ಡ್ & ಬದಲಾಯಿಸಲಾಗದು · ಕ್ಲೌಡ್ ಮುಕ್ತ · ಹೋಸ್ಟ್: localhost", "badge_needs_review": "ಪರಿಶೀಲನೆ ಅಗತ್ಯವಿದೆ", "Sale Deed": "ಮಾರಾಟ ಪತ್ರ", "Agreement of Sale-cum-General Power of Attorney": "ಮಾರಾಟ ಮತ್ತು ಜಿಪಿಎ ಒಪ್ಪಂದ", "Land Record": "ಭೂ ದಾಖಲೆ", "Unnumbered": "ಸಂಖ್ಯೆಯಿಲ್ಲದ", "Mandal": "ಹೋಬಳಿ", "Presently Mulugu District": "ಪ್ರಸ್ತುತ ಮುಲುಗು ಜಿಲ್ಲೆ", "intake_h1": "ಹೊಸ ದಾಖಲೆ ಸ್ಕ್ಯಾನ್ & <em>ಸ್ವೀಕಾರ</em>", "intake_title": "ನೋಂದಣಿ ಮತ್ತು ಸ್ಕ್ಯಾನ್ ಸ್ವೀಕಾರ", "dz_main_text": "ಸ್ಕ್ಯಾನ್ ಮಾಡಿದ ಕಡತವನ್ನು ಇಲ್ಲಿ ಹಾಕಿ, ಅಥವಾ <span>ಆಯ್ಕೆ ಮಾಡಿ</span>", "ocr_engine_title": "OCR ಪ್ರೊಸೆಸಿಂಗ್ ಎಂಜಿನ್", "val_grounding_title": "ಪರಿಶೀಲನೆ ಮತ್ತು ಭೌಗೋಳಿಕ ತಾಳೆ", "btn_start_extract": "ಮಾಹಿತಿ ಹೊರತೆಗೆಯುವಿಕೆ ಪ್ರಾರಂಭಿಸಿ →"}, "ta": {"dash_sidebar_brand": "ஒன்பூமி · பதிவேடு பிரிவு", "nav_main_menu": "முதன்மை பட்டியல்", "nav_dash": "டாஷ்போர்டு", "nav_ops_dash": "செயல்பாட்டு டாஷ்போர்டு", "nav_new_scan": "புதிய ஸ்கேன் & உட்கொள்ளல்", "nav_new_scan_link": "புதிய ஆவண ஸ்கேன்", "badge_desk01": "பிரிவு 01", "nav_master_reg": "முதன்மை பத்திரப் பதிவேடு", "nav_clerk_queue": "எழுத்தர் மதிப்பாய்வு வரிசை", "nav_verified_certs": "சரிபார்க்கப்பட்ட சான்றிதழ்கள்", "lbl_air_gapped": "பாதுகாப்பான ஏர்-கேப் அமைப்பு", "lbl_rsa_stat": "RSA-PSS 2048:", "lbl_active": "செயலில் உள்ளது", "lbl_worker": "பணியகம்:", "btn_new_scan": "+ புதிய ஆவண ஸ்கேன்", "btn_return_dash": "← டாஷ்போர்டுக்கு திரும்பு", "lbl_day_book": "நாள் குறிப்பேடு தேதி:", "lbl_register_desk": "பதிவேடு பிரிவு 01 ·", "dash_h1": "பதிவு செயல்பாடுகள் & <em>பகுப்பாய்வு</em>", "dash_tagline": "நில ஆவணங்களின் முழுமையான ஆஃப்லைன் பதிவேடு, எழுத்தர் மதிப்பாய்வு மற்றும் டிஜிட்டல் முத்திரைகள்.", "kpi_total": "மொத்த ஆவணங்கள்", "kpi_total_sub": "ஆஃப்லைன் பதிவேட்டில் பதிவு செய்யப்பட்ட நில ஆவணங்கள்", "kpi_sealed": "முத்திரையிடப்பட்டு சான்றளிக்கப்பட்டது", "kpi_sealed_sub": "சான்றிதழ் விகிதம் · RSA-PSS கையொப்பமிடப்பட்டது", "kpi_review": "எழுத்தர் மதிப்பாய்வு வரிசை", "kpi_review_sub": "எழுத்தர் சரிபார்ப்பு மற்றும் ஒப்புதலுக்காக காத்திருக்கிறது", "kpi_noncert": "சான்றளிக்கப்படாதவை", "kpi_noncert_sub": "நிராகரிக்கப்பட்ட அல்லது முரண்பாடான பதிவுகள்", "banner_title": "எழுத்தர் மதிப்பாய்வு நடவடிக்கை தேவை:", "banner_prefix": "இங்கு", "banner_suffix": "ஆவணங்கள் சான்றுகளுடன் சரிபார்க்கப்பட்டு அதிகாரி கையொப்பத்திற்காக காத்திருக்கின்றன.", "btn_open_next": "அடுத்த ஆவணத்தைத் திற", "chart_vel_title": "பதிவு வேகம் மற்றும் முத்திரை வெளியீடு", "chart_vel_meta": "ஆவண உள்ளீடு மற்றும் சரிபார்க்கப்பட்ட டிஜிட்டல் சான்றிதழ்கள்", "chart_total_intake": "மொத்த உள்ளீடு", "chart_sealed_on_file": "கோப்பில் முத்திரையிடப்பட்டது", "chart_doc_class": "ஆவண வகைப்பாடு", "chart_doc_meta": "சட்ட ஆவண வகைகளின் விநியோகம்", "chart_gis_lbl": "GIS தீர்வு:", "chart_sale_deeds": "விற்பனைப் பத்திரங்கள்", "chart_agreements_gpa": "ஒப்பந்தங்கள் / GPA", "chart_other_records": "பிற ஆவணங்கள்", "chart_spatial_match": "தெலங்கானா (TGRAC) & கர்நாடகா இடஞ்சார்ந்த பொருத்தம்", "chart_resolved": "தீர்க்கப்பட்டது", "reg_title": "முதன்மை நிலப் பத்திரப் பதிவேடு", "search_placeholder": "ஆவண எண், கிராமம், நபர், சர்வே மூலம் தேடவும்...", "tab_all": "அனைத்தும்", "tab_sealed": "முத்திரையிடப்பட்டது", "tab_pending": "நிலுவை", "tab_rejected": "நிராகரிக்கப்பட்டது", "btn_scan_new_deed": "+ புதிய ஆவணம் ஸ்கேன் செய்க", "th_sl": "வரிசை எண்", "th_received": "பெறப்பட்ட தேதி", "th_doc_no": "ஆவணம் & எண்", "th_parties": "நபர்கள்", "th_location": "இடம்", "th_survey": "சர்வே பதவி", "th_stamp": "முத்திரை வரி", "th_status": "நிலை", "th_actions": "செயல்கள்", "badge_approved": "முத்திரையிடப்பட்டு சான்றளிக்கப்பட்டது", "badge_rejected": "பதிவேட்டில் நிராகரிக்கப்பட்டது", "badge_under_review": "மதிப்பாய்வு தேவை", "badge_extracted": "சரிபார்ப்பு நிலுவை", "badge_ready_for_approval": "முத்திரைக்கு தயார்", "badge_pass": "சரிபார்ப்பு வெற்றி", "badge_fail": "சரிபார்ப்பு தோல்வி", "btn_review_console": "மதிப்பாய்வு கன்சோல்", "btn_cert": "✓ சான்றிதழ்", "lbl_fingerprint": "RSA-PSS 2048 கைரேகை:", "btn_copy": "நகலெடு", "lbl_spatial_index": "இடஞ்சார்ந்த குறியீடு:", "lbl_key_store": "விசை சேமிப்பகம்:", "foot_console_title": "ஒன்பூமி பதிவேடு கன்சோல் · தனித்த நில ஆவணப் பிரித்தெடுத்தல் மற்றும் டிஜிட்டல் முத்திரை அமைப்பு", "foot_air_gapped_info": "100% ஏர்-கேப் அமைப்பு & மாற்ற முடியாதது · கிளவுட் பயன்பாடு இல்லை · ஹோஸ்ட்: localhost", "badge_needs_review": "மதிப்பாய்வு தேவை", "Sale Deed": "விற்பனைப் பத்திரம்", "Agreement of Sale-cum-General Power of Attorney": "விற்பனை மற்றும் ஜிபிஏ ஒப்பந்தம்", "Land Record": "நில ஆவணம்", "Unnumbered": "எண் குறிப்பிடப்படாதது", "Mandal": "மண்டலம்", "Presently Mulugu District": "தற்போது முலுகு மாவட்டம்", "intake_h1": "புதிய ஆவண ஸ்கேன் & <em>உட்கொள்ளல்</em>", "intake_title": "பதிவு மற்றும் ஸ்கேன் உட்கொள்ளல்", "dz_main_text": "ஸ்கேன் செய்யப்பட்ட ஆவணத்தை இங்கே போடவும், அல்லது <span>கோப்புகளைத் தேர்ந்தெடுக்கவும்</span>", "ocr_engine_title": "OCR செயலாக்க இயந்திரம்", "val_grounding_title": "சரிபார்ப்பு & இடஞ்சார்ந்த சோதனை", "btn_start_extract": "தரவுப் பிரித்தெடுத்தலைத் தொடங்கு →"}};
+
+  function applyDashLanguage(lang) {
+    if (!DASH_I18N[lang]) lang = 'en';
+    document.documentElement.lang = lang;
+    try { localStorage.setItem('onebhoomi_lang', lang); } catch(e) {}
+
+    const select = document.getElementById('langSelect');
+    if (select && select.value !== lang) select.value = lang;
+
+    const dict = DASH_I18N[lang] || DASH_I18N['en'];
+
+    // 1. Tagged text elements
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      if (dict[key] !== undefined) {
+        el.innerHTML = dict[key];
+      }
+    });
+
+    // 2. Input Placeholders
+    document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+      const key = el.getAttribute('data-i18n-ph');
+      if (dict[key] !== undefined) {
+        el.setAttribute('placeholder', dict[key]);
+      }
+    });
+
+    // 3. Dynamic table cells
+    document.querySelectorAll('.td-doc-main').forEach(el => {
+      const orig = el.getAttribute('data-orig') || el.textContent.trim();
+      el.setAttribute('data-orig', orig);
+      if (dict[orig]) el.textContent = dict[orig];
+    });
+
+    document.querySelectorAll('.td-doc-sub').forEach(el => {
+      const orig = el.getAttribute('data-orig') || el.textContent.trim();
+      el.setAttribute('data-orig', orig);
+      if (orig === 'Unnumbered' && dict['Unnumbered']) {
+        el.textContent = dict['Unnumbered'];
+      }
+    });
+
+    document.querySelectorAll('.td-place-sub').forEach(el => {
+      const orig = el.getAttribute('data-orig') || el.textContent.trim();
+      el.setAttribute('data-orig', orig);
+      if (orig.startsWith('Mandal:') && dict['Mandal']) {
+        el.textContent = orig.replace('Mandal:', dict['Mandal'] + ':');
+      }
+    });
+  }
+
+  let activeLang = 'en';
+  try { activeLang = localStorage.getItem('onebhoomi_lang') || 'en'; } catch(e) {}
+  applyDashLanguage(activeLang);
+
+  const langSelector = document.getElementById('langSelect');
+  if (langSelector) {
+    langSelector.addEventListener('change', (e) => {
+      applyDashLanguage(e.target.value);
+    });
+  }
 """
 
 
@@ -617,7 +756,7 @@ def _fmt_date(iso: str) -> str:
 
 def _badge(status: str) -> str:
     label = BADGE_LABELS.get(status, status.replace("_", " ").title())
-    return f'<span class="badge b-{html.escape(status.lower())}">{html.escape(label)}</span>'
+    return f'<span class="badge b-{html.escape(status.lower())}" data-i18n="badge_{status.lower()}">{html.escape(label)}</span>'
 
 
 def _fingerprint() -> str:
@@ -882,43 +1021,39 @@ def _render_sidebar(active_item: str, desk_n: int, sealed_n: int, worker_label: 
     return f"""
   <aside class="dash-sidebar">
     <div class="sidebar-top">
-      <a class="brand-box" href="/dashboard">
-        <b>MUHAR</b>
-        <span>मुहर · REGISTRY DESK</span>
+      <a class="brand-box" href="/" title="Return to Landing Page">
+        <b>OneBhoomi</b>
+        <span data-i18n="dash_sidebar_brand">वनभूमि · REGISTRY DESK</span>
       </a>
 
-      <div class="nav-label">Main Menu</div>
+      <div class="nav-label" data-i18n="nav_main_menu">Main Menu</div>
       <ul class="nav-menu">
         <li>
           <a {dash_active} href="/dashboard">
             <span class="nav-link-left">
-              <span class="nav-icon">📊</span>
-              <span>Dashboard</span>
+              <span data-i18n="nav_dash">Dashboard</span>
             </span>
           </a>
         </li>
         <li>
           <a {scan_active} href="/new">
             <span class="nav-link-left">
-              <span class="nav-icon">⚡</span>
-              <span>New Scan &amp; Intake</span>
+              <span data-i18n="nav_new_scan">New Scan &amp; Intake</span>
             </span>
-            <span class="nav-badge badge-primary">Desk 01</span>
+            <span class="nav-badge badge-primary" data-i18n="badge_desk01">Desk 01</span>
           </a>
         </li>
         <li>
           <a href="/dashboard#ledgerSection">
             <span class="nav-link-left">
-              <span class="nav-icon">📖</span>
-              <span>Master Deed Register</span>
+              <span data-i18n="nav_master_reg">Master Deed Register</span>
             </span>
           </a>
         </li>
         <li>
           <a href="/dashboard#ledgerSection" onclick="if(window.filterTab) filterTab('PENDING');">
             <span class="nav-link-left">
-              <span class="nav-icon">✍️</span>
-              <span>Clerk Review Queue</span>
+              <span data-i18n="nav_clerk_queue">Clerk Review Queue</span>
             </span>
             <span class="nav-badge badge-amber">{desk_n}</span>
           </a>
@@ -926,8 +1061,7 @@ def _render_sidebar(active_item: str, desk_n: int, sealed_n: int, worker_label: 
         <li>
           <a href="/dashboard#ledgerSection" onclick="if(window.filterTab) filterTab('SEALED');">
             <span class="nav-link-left">
-              <span class="nav-icon">🛡️</span>
-              <span>Verified Certificates</span>
+              <span data-i18n="nav_verified_certs">Verified Certificates</span>
             </span>
             <span class="nav-badge badge-green">{sealed_n}</span>
           </a>
@@ -938,11 +1072,11 @@ def _render_sidebar(active_item: str, desk_n: int, sealed_n: int, worker_label: 
     <div class="sidebar-bottom">
       <div class="sys-pill">
         <span class="sys-dot"></span>
-        <span>AIR-GAPPED &amp; SECURE</span>
+        <span data-i18n="lbl_air_gapped">AIR-GAPPED &amp; SECURE</span>
       </div>
       <div class="sys-meta">
-        <div><b>RSA-PSS 2048:</b> Active</div>
-        <div style="margin-top:2px;"><b>Worker:</b> {html.escape(worker_label)}</div>
+        <div><b data-i18n="lbl_rsa_stat">RSA-PSS 2048:</b> <span data-i18n="lbl_active">Active</span></div>
+        <div style="margin-top:2px;"><b data-i18n="lbl_worker">Worker:</b> {html.escape(worker_label)}</div>
       </div>
     </div>
   </aside>
@@ -977,10 +1111,10 @@ def render_dashboard(host_name: str = "localhost:8001", colab_url: str = "") -> 
         <div class="notice-info">
           <span class="notice-icon">✍️</span>
           <div class="notice-text">
-            <b>Clerk Review Action Required:</b> There are <b>{data['desk_n']}</b> land record(s) awaiting verification against scanned evidence and officer digital signing.
+            <b><span data-i18n="banner_title">Clerk Review Action Required:</span></b> <span data-i18n="banner_prefix">There are</span> <b>{data['desk_n']}</b> <span data-i18n="banner_suffix">land record(s) awaiting verification against scanned evidence and officer digital signing.</span>
           </div>
         </div>
-        <a class="btn btn-primary btn-sm" href="/record?verification_id={html.escape(oldest_id)}">Open Next Record ({html.escape(doc_label)}) &rarr;</a>
+        <a class="btn btn-primary btn-sm" href="/record?verification_id={html.escape(oldest_id)}"><span data-i18n="btn_open_next">Open Next Record</span> ({html.escape(doc_label)}) &rarr;</a>
       </div>"""
 
     # Master Ledger Table Rows
@@ -992,7 +1126,7 @@ def render_dashboard(host_name: str = "localhost:8001", colab_url: str = "") -> 
             
             verify_btn = ""
             if r["status"] == "APPROVED":
-                verify_btn = f'<a class="act-btn act-verify" title="View Public Certificate & Offline QR" href="/?verification_id={html.escape(r["id"])}">✓ Certificate</a>'
+                verify_btn = f'<a class="act-btn act-verify" title="View Public Certificate & Offline QR" href="/?verification_id={html.escape(r["id"])}" data-i18n="btn_cert">✓ Certificate</a>'
 
             body_rows.append(
                 f"""
@@ -1060,10 +1194,10 @@ def render_dashboard(host_name: str = "localhost:8001", colab_url: str = "") -> 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MUHAR — Land Records Office Dashboard</title>
+  <title>OneBhoomi — Land Records Office Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Archivo:wght@400;500;600;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Archivo:wght@400;500;600;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Noto+Sans+Telugu:wght@400;500;600;700&family=Noto+Sans+Kannada:wght@400;500;600;700&family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>{DASHBOARD_CSS}</style>
 </head>
 <body>
@@ -1081,51 +1215,62 @@ def render_dashboard(host_name: str = "localhost:8001", colab_url: str = "") -> 
       <!-- Top Action Bar -->
       <div class="top-action-bar">
         <div class="header-left">
-          <h1>Registry Operations &amp; <em>Analytics</em></h1>
-          <div class="header-tagline">Complete offline day book of land records, human-in-the-loop clerk reviews, and cryptographic digital seals.</div>
+          <h1 data-i18n="dash_h1">Registry Operations &amp; <em>Analytics</em></h1>
+          <div class="header-tagline" data-i18n="dash_tagline">Complete offline day book of land records, human-in-the-loop clerk reviews, and cryptographic digital seals.</div>
         </div>
         <div class="header-right">
-          <div class="date-badge">DAY BOOK DATE: <b>{today}</b></div>
-          <a class="btn btn-primary" href="/new">+ New Document Scan</a>
+          <div class="lang-picker" title="Change Language">
+            <svg class="lang-svg" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+            <select id="langSelect" class="lang-dropdown" aria-label="Select Language">
+              <option value="en" selected>English</option>
+              <option value="hi">हिंदी (Hindi)</option>
+              <option value="te">తెలుగు (Telugu)</option>
+              <option value="kn">ಕನ್ನಡ (Kannada)</option>
+              <option value="ta">தமிழ் (Tamil)</option>
+            </select>
+          </div>
         </div>
-      </div>
 
       <!-- KPI Summary Cards (4 Cards) -->
       <div class="kpi-grid">
         <div class="kpi-card">
           <div class="kpi-label">
-            <span>Total on File</span>
+            <span data-i18n="kpi_total">Total on File</span>
             <span>📂</span>
           </div>
           <div class="kpi-num">{data['on_file']}</div>
-          <div class="kpi-sub">Total land deeds recorded in offline registry</div>
+          <div class="kpi-sub" data-i18n="kpi_total_sub">Total land deeds recorded in offline registry</div>
         </div>
 
         <div class="kpi-card kpi-sealed">
           <div class="kpi-label">
-            <span>Sealed &amp; Certified</span>
+            <span data-i18n="kpi_sealed">Sealed &amp; Certified</span>
             <span>🛡️</span>
           </div>
           <div class="kpi-num">{data['sealed_n']}</div>
-          <div class="kpi-sub">{data['seal_rate']} certification rate · RSA-PSS signed</div>
+          <div class="kpi-sub">{data['seal_rate']} <span data-i18n="kpi_sealed_sub">certification rate · RSA-PSS signed</span></div>
         </div>
 
         <div class="kpi-card kpi-desk">
           <div class="kpi-label">
-            <span>Clerk Review Queue</span>
+            <span data-i18n="kpi_review">Clerk Review Queue</span>
             <span>✍️</span>
           </div>
           <div class="kpi-num">{data['desk_n']}</div>
-          <div class="kpi-sub">Awaiting clerk verification &amp; approval</div>
+          <div class="kpi-sub" data-i18n="kpi_review_sub">Awaiting clerk verification &amp; approval</div>
         </div>
 
         <div class="kpi-card kpi-rejected">
           <div class="kpi-label">
-            <span>Non-Certified</span>
+            <span data-i18n="kpi_noncert">Non-Certified</span>
             <span>⚠️</span>
           </div>
           <div class="kpi-num">{data['rejected_n']}</div>
-          <div class="kpi-sub">Rejected or anomalous scan records</div>
+          <div class="kpi-sub" data-i18n="kpi_noncert_sub">Rejected or anomalous scan records</div>
         </div>
       </div>
 
@@ -1139,17 +1284,17 @@ def render_dashboard(host_name: str = "localhost:8001", colab_url: str = "") -> 
         <div class="chart-card">
           <div class="chart-header">
             <div>
-              <div class="chart-title">Registration Velocity &amp; Sealing Throughput</div>
-              <div class="chart-meta">Timeline intake volume vs verified cryptographic certifications</div>
+              <div class="chart-title" data-i18n="chart_vel_title">Registration Velocity &amp; Sealing Throughput</div>
+              <div class="chart-meta" data-i18n="chart_vel_meta">Timeline intake volume vs verified cryptographic certifications</div>
             </div>
             <div style="display:flex; gap:12px; font-family:var(--type); font-size:10.5px;">
               <span style="display:flex; align-items:center; gap:5px;">
                 <span style="width:8px; height:8px; border-radius:50%; background:var(--stamp);"></span>
-                Total Intake
+                <span data-i18n="chart_total_intake">Total Intake</span>
               </span>
               <span style="display:flex; align-items:center; gap:5px;">
                 <span style="width:8px; height:8px; border-radius:50%; background:var(--green);"></span>
-                Sealed on File
+                <span data-i18n="chart_sealed_on_file">Sealed on File</span>
               </span>
             </div>
           </div>
@@ -1162,11 +1307,11 @@ def render_dashboard(host_name: str = "localhost:8001", colab_url: str = "") -> 
         <div class="chart-card">
           <div class="chart-header">
             <div>
-              <div class="chart-title">Document Classification</div>
-              <div class="chart-meta">Distribution of legal record deed categories</div>
+              <div class="chart-title" data-i18n="chart_doc_class">Document Classification</div>
+              <div class="chart-meta" data-i18n="chart_doc_meta">Distribution of legal record deed categories</div>
             </div>
             <div class="chart-meta" style="color:var(--green); font-weight:700;">
-              GIS Resolved: {data['gis_rate']}
+              <span data-i18n="chart_gis_lbl">GIS Resolved:</span> {data['gis_rate']}
             </div>
           </div>
 
@@ -1179,21 +1324,21 @@ def render_dashboard(host_name: str = "localhost:8001", colab_url: str = "") -> 
               <div class="legend-row">
                 <span class="legend-left">
                   <span class="legend-color" style="background:var(--stamp);"></span>
-                  <span>Sale Deeds</span>
+                  <span data-i18n="chart_sale_deeds">Sale Deeds</span>
                 </span>
                 <span class="legend-num">{data['sale_count']}</span>
               </div>
               <div class="legend-row">
                 <span class="legend-left">
                   <span class="legend-color" style="background:var(--gold);"></span>
-                  <span>Agreements / GPA</span>
+                  <span data-i18n="chart_agreements_gpa">Agreements / GPA</span>
                 </span>
                 <span class="legend-num">{data['gpa_count']}</span>
               </div>
               <div class="legend-row">
                 <span class="legend-left">
                   <span class="legend-color" style="background:var(--green);"></span>
-                  <span>Other Records</span>
+                  <span data-i18n="chart_other_records">Other Records</span>
                 </span>
                 <span class="legend-num">{data['other_count']}</span>
               </div>
@@ -1202,8 +1347,8 @@ def render_dashboard(host_name: str = "localhost:8001", colab_url: str = "") -> 
 
           <div class="gis-rate-meter">
             <div class="meter-label">
-              <span>Telangana (TGRAC) &amp; Karnataka Spatial Match</span>
-              <b>{data['gis_rate']} Resolved</b>
+              <span data-i18n="chart_spatial_match">Telangana (TGRAC) &amp; Karnataka Spatial Match</span>
+              <b>{data['gis_rate']} <span data-i18n="chart_resolved">Resolved</span></b>
             </div>
             <div class="meter-bar">
               <div class="meter-fill" style="width:{data['gis_rate']};"></div>
@@ -1217,21 +1362,21 @@ def render_dashboard(host_name: str = "localhost:8001", colab_url: str = "") -> 
       <section class="ledger-section" id="ledgerSection">
         <div class="ledger-toolbar">
           <div class="toolbar-left">
-            <h2 class="ledger-head-title">Master Deed Register</h2>
+            <h2 class="ledger-head-title" data-i18n="reg_title">Master Deed Register</h2>
             <div class="search-wrap">
               <span class="search-icon">🔍</span>
-              <input type="text" id="ledgerSearch" class="search-input" placeholder="Search by Doc #, Village, Party, Survey...">
+              <input type="text" id="ledgerSearch" class="search-input" placeholder="Search by Doc #, Village, Party, Survey..." data-i18n-ph="search_placeholder">
             </div>
           </div>
 
           <div class="toolbar-right">
             <div class="filter-tabs">
-              <button type="button" class="tab-btn active" data-filter="ALL">All ({data['on_file']})</button>
-              <button type="button" class="tab-btn" data-filter="SEALED">Sealed ({data['sealed_n']})</button>
-              <button type="button" class="tab-btn" data-filter="PENDING">Pending ({data['desk_n']})</button>
-              <button type="button" class="tab-btn" data-filter="REJECTED">Rejected ({data['rejected_n']})</button>
+              <button type="button" class="tab-btn active" data-filter="ALL"><span data-i18n="tab_all">All</span> ({data['on_file']})</button>
+              <button type="button" class="tab-btn" data-filter="SEALED"><span data-i18n="tab_sealed">Sealed</span> ({data['sealed_n']})</button>
+              <button type="button" class="tab-btn" data-filter="PENDING"><span data-i18n="tab_pending">Pending</span> ({data['desk_n']})</button>
+              <button type="button" class="tab-btn" data-filter="REJECTED"><span data-i18n="tab_rejected">Rejected</span> ({data['rejected_n']})</button>
             </div>
-            <a class="btn btn-primary btn-sm" href="/new">+ Scan New Deed</a>
+            <a class="btn btn-primary btn-sm" href="/new" data-i18n="btn_scan_new_deed">+ Scan New Deed</a>
           </div>
         </div>
 
@@ -1244,17 +1389,17 @@ def render_dashboard(host_name: str = "localhost:8001", colab_url: str = "") -> 
       <div class="system-strip" id="systemStrip">
         <div class="strip-group">
           <div class="strip-item">
-            <span>🔐 <b>RSA-PSS 2048 Fingerprint:</b></span>
+            <span>🔐 <b data-i18n="lbl_fingerprint">RSA-PSS 2048 Fingerprint:</b></span>
             <code>{html.escape(fp_text[:28])}...</code>
             <button type="button" class="btn-copy" onclick="copyFingerprint('{html.escape(fp_text)}')">Copy</button>
           </div>
         </div>
         <div class="strip-group">
           <div class="strip-item">
-            <span>🗺️ <b>Spatial Index:</b> Telangana (TGRAC) &amp; Karnataka Master Datasets Loaded</span>
+            <span>🗺️ <b data-i18n="lbl_spatial_index">Spatial Index:</b> Telangana (TGRAC) &amp; Karnataka Master Datasets Loaded</span>
           </div>
           <div class="strip-item">
-            <span>🛡️ <b>Key Store:</b> <code>verification_keys/</code></span>
+            <span>🛡️ <b data-i18n="lbl_key_store">Key Store:</b> <code>verification_keys/</code></span>
           </div>
         </div>
       </div>
@@ -1265,7 +1410,7 @@ def render_dashboard(host_name: str = "localhost:8001", colab_url: str = "") -> 
     <footer class="dash-footer">
       <div class="main-inner" style="padding-top:0; padding-bottom:0;">
         <div class="dash-footer-wrap">
-          <div><b>MUHAR Registry Console</b> · Standalone Land Document Extraction &amp; Digital Seal System</div>
+          <div><b>OneBhoomi Registry Console</b> · Standalone Land Document Extraction &amp; Digital Seal System</div>
           <div>100% Air-Gapped &amp; Immutable · Zero cloud dependencies · Host: <code>{html.escape(host_name)}</code></div>
         </div>
       </div>
@@ -1318,10 +1463,10 @@ def render_new_scan(host_name: str = "localhost:8001", colab_url: str = "", mess
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MUHAR — New Document Scan &amp; Intake</title>
+  <title>OneBhoomi — New Document Scan &amp; Intake</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Archivo:wght@400;500;600;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Archivo:wght@400;500;600;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Noto+Sans+Telugu:wght@400;500;600;700&family=Noto+Sans+Kannada:wght@400;500;600;700&family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>{DASHBOARD_CSS}</style>
 </head>
 <body>
@@ -1348,21 +1493,32 @@ def render_new_scan(host_name: str = "localhost:8001", colab_url: str = "", mess
       <!-- Top Action Bar -->
       <div class="top-action-bar">
         <div class="header-left">
-          <h1>New Document Scan &amp; <em>Intake</em></h1>
+          <h1 data-i18n="intake_h1">New Document Scan &amp; <em>Intake</em></h1>
           <div class="header-tagline">Desk 01 · Process land documents (Sale Deeds, Agreements, GPAs) with local OCR or Kaggle GPU acceleration.</div>
         </div>
         <div class="header-right">
-          <div class="date-badge">REGISTER DESK 01 · <b>{today}</b></div>
-          <a class="btn btn-ghost" href="/dashboard">&larr; Return to Dashboard</a>
+          <div class="lang-picker" title="Change Language">
+            <svg class="lang-svg" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+            <select id="langSelect" class="lang-dropdown" aria-label="Select Language">
+              <option value="en" selected>English</option>
+              <option value="hi">हिंदी (Hindi)</option>
+              <option value="te">తెలుగు (Telugu)</option>
+              <option value="kn">ಕನ್ನಡ (Kannada)</option>
+              <option value="ta">தமிழ் (Tamil)</option>
+            </select>
+          </div>
         </div>
-      </div>
 
       {msg_banner}
 
       <!-- Dedicated Intake Card -->
       <div class="intake-card">
         <div class="intake-head">
-          <h2>Registration &amp; Scan Intake</h2>
+          <h2 data-i18n="intake_title">Registration &amp; Scan Intake</h2>
           <span class="intake-badge">Stage 1 · Document Intake</span>
         </div>
 
@@ -1376,7 +1532,7 @@ def render_new_scan(host_name: str = "localhost:8001", colab_url: str = "", mess
               <line x1="12" y1="18" x2="12" y2="12"></line>
               <line x1="9" y1="15" x2="15" y2="15"></line>
             </svg>
-            <div class="dz-main-text">Drop the document scan copy here, or <span>browse local files</span></div>
+            <div class="dz-main-text" data-i18n="dz_main_text">Drop the document scan copy here, or <span>browse local files</span></div>
             <div class="dz-sub-text">Supports PDF (Multi-page supported) · PNG · JPG · TIFF &mdash; Read locally, certified with RSA-PSS</div>
             <input type="file" name="document_image" id="scan_file_input" accept="image/*,.pdf,application/pdf" hidden required>
           </div>
@@ -1396,7 +1552,7 @@ def render_new_scan(host_name: str = "localhost:8001", colab_url: str = "", mess
           <!-- OCR Engine & Execution Settings -->
           <div class="config-grid">
             <div class="config-box">
-              <div class="config-box-title">OCR Processing Engine</div>
+              <div class="config-box-title" data-i18n="ocr_engine_title">OCR Processing Engine</div>
               <select name="processing_mode" id="processing_mode" class="select-mode">
                 <option value="gpu" {gpu_selected}>⚡ Remote GPU Worker (Encrypted Cloudflare Tunnel, ~2s)</option>
                 <option value="cpu" {cpu_selected}>🐢 Local CPU (PaddleOCR on this machine)</option>
@@ -1405,7 +1561,7 @@ def render_new_scan(host_name: str = "localhost:8001", colab_url: str = "", mess
             </div>
 
             <div class="config-box">
-              <div class="config-box-title">Validation &amp; Spatial Grounding</div>
+              <div class="config-box-title" data-i18n="val_grounding_title">Validation &amp; Spatial Grounding</div>
               <div style="font-size:13px; color:var(--ink); font-weight:600; margin-bottom:4px;">
                 ✓ Automatic 5-Point Rule Engine &amp; GIS Check
               </div>
@@ -1440,7 +1596,7 @@ def render_new_scan(host_name: str = "localhost:8001", colab_url: str = "", mess
             <div class="submit-note">
               🔒 Zero external database or cloud storage. Files are processed in memory and persisted into local verification store.
             </div>
-            <button type="submit" class="btn btn-primary" style="padding:12px 28px; font-size:12.5px;">
+            <button type="submit" class="btn btn-primary" style="padding:12px 28px; font-size:12.5px;" data-i18n="btn_start_extract">
               Start Document Extraction &rarr;
             </button>
           </div>
@@ -1454,7 +1610,7 @@ def render_new_scan(host_name: str = "localhost:8001", colab_url: str = "", mess
     <footer class="dash-footer">
       <div class="main-inner" style="padding-top:0; padding-bottom:0;">
         <div class="dash-footer-wrap">
-          <div><b>MUHAR Registry Console</b> · Standalone Land Document Extraction &amp; Digital Seal System</div>
+          <div><b>OneBhoomi Registry Console</b> · Standalone Land Document Extraction &amp; Digital Seal System</div>
           <div>100% Air-Gapped &amp; Immutable · Zero cloud dependencies · Host: <code>{html.escape(host_name)}</code></div>
         </div>
       </div>

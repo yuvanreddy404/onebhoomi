@@ -70,7 +70,7 @@ cd Chatgpt-land
 ### 2. Install Dependencies
 
 ```bash
-pip install cryptography opencv-python numpy
+pip install cryptography opencv-python numpy pypdfium2 pillow requests
 ```
 *(Optional for local CPU OCR: `pip install paddleocr paddlepaddle`)*
 

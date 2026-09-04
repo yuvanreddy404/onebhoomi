@@ -46,6 +46,32 @@ def get_lan_ip() -> str:
         s.close()
     return ip
 
+
+def get_public_web_tunnel() -> str:
+    port = os.environ.get("PORT", 8001)
+    txt_path = Path(__file__).parent / "web_tunnel_url.txt"
+    if txt_path.exists():
+        try:
+            url = txt_path.read_text(encoding="utf-8").strip()
+            if url.startswith("http"):
+                try:
+                    resp = requests.get(url, timeout=1.2)
+                    if resp.status_code < 500 and "no tunnel" not in resp.text.lower():
+                        return url
+                except Exception:
+                    pass
+                # Stale or dead tunnel file, remove it
+                try:
+                    txt_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    lan_ip = get_lan_ip()
+    if lan_ip and lan_ip != "127.0.0.1":
+        return f"http://{lan_ip}:{port}"
+    return f"http://localhost:{port}"
+
 # =====================================================================
 # Kaggle / Colab OCR Tunnel Configuration
 # =====================================================================
@@ -282,20 +308,73 @@ HTML_PAGE = Template("""<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MUHAR — Registry Console</title>
+  <title>OneBhoomi — Registry Console</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Archivo:wght@400;500;600;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Archivo:wght@400;500;600;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Noto+Sans+Telugu:wght@400;500;600;700&family=Noto+Sans+Kannada:wght@400;500;600;700&family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root{
       --paper:#F6F0E1; --paper-deep:#EFE6D0; --ink:#221D17; --ink-soft:#5A5142;
       --stamp:#A6193C; --stamp-deep:#7C1030; --rosette:#C99AA8; --green:#2E6B4F;
       --green-deep:#1C4A36; --amber:#A96A1F; --gold:#C9A227;
       --rule:#C9BC9F; --rule-soft:#DCD2B8; --card:#FFFDF6;
-      --serif:"Fraunces",Georgia,serif;
-      --type:"Courier Prime","Courier New",monospace;
-      --sans:"Archivo",system-ui,sans-serif;
+      --serif:"Fraunces", "Noto Serif Devanagari", "Noto Serif Telugu", "Noto Serif Kannada", "Noto Serif Tamil", Georgia, serif;
+      --type:"Courier Prime", "Noto Sans Devanagari", "Noto Sans Telugu", "Noto Sans Kannada", "Noto Sans Tamil", "Courier New", monospace;
+      --sans:"Archivo", "Noto Sans Devanagari", "Noto Sans Telugu", "Noto Sans Kannada", "Noto Sans Tamil", system-ui, sans-serif;
     }
+
+    /* Header Language Picker */
+    .lang-picker {
+      display: inline-flex;
+      align-items: center;
+      background: var(--paper-deep);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      padding: 3px 8px;
+      margin-left: 12px;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    .lang-picker:focus-within, .lang-picker:hover {
+      border-color: var(--stamp);
+      box-shadow: 0 0 0 2px rgba(166,25,60,0.12);
+    }
+    .lang-icon {
+      font-size: 13px;
+      margin-right: 6px;
+      color: var(--ink-soft);
+      line-height: 1;
+      user-select: none;
+    }
+    .lang-dropdown {
+      background: transparent;
+      border: none;
+      outline: none;
+      font-family: var(--type);
+      font-size: 11.5px;
+      color: var(--ink);
+      font-weight: 700;
+      letter-spacing: .5px;
+      cursor: pointer;
+      padding: 2px 18px 2px 2px;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%235A5142' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right center;
+      background-size: 8px 5px;
+    }
+    .lang-dropdown option {
+      background: #FFFDF6;
+      color: #221D17;
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 10px;
+    }
+    html[lang="hi"] body, html[lang="hi"] p, html[lang="hi"] span, html[lang="hi"] a { font-family: "Noto Sans Devanagari", var(--sans); }
+    html[lang="te"] body, html[lang="te"] p, html[lang="te"] span, html[lang="te"] a { font-family: "Noto Sans Telugu", var(--sans); }
+    html[lang="kn"] body, html[lang="kn"] p, html[lang="kn"] span, html[lang="kn"] a { font-family: "Noto Sans Kannada", var(--sans); }
+    html[lang="ta"] body, html[lang="ta"] p, html[lang="ta"] span, html[lang="ta"] a { font-family: "Noto Sans Tamil", var(--sans); }
     *{margin:0;padding:0;box-sizing:border-box}
     html{scroll-behavior:smooth}
     body{
@@ -323,12 +402,12 @@ HTML_PAGE = Template("""<!doctype html>
     @media(max-width:640px){.wrap{padding:0 18px}}
 
     header{border-bottom:3px double var(--rule)}
-    .reg-bar{display:flex;align-items:center;justify-content:space-between;padding:20px 0;gap:20px}
-    .brand{display:flex;align-items:baseline;gap:12px;text-decoration:none;color:var(--ink)}
-    .brand b{font-family:var(--serif);font-weight:900;font-size:26px;letter-spacing:.04em}
-    .brand span{font-family:var(--type);font-size:11px;letter-spacing:.18em;color:var(--stamp);text-transform:uppercase}
-    nav{display:flex;gap:28px;align-items:center}
-    nav a{font-family:var(--type);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);text-decoration:none}
+    .reg-bar{display:flex;align-items:center;justify-content:space-between;padding:20px 0;gap:24px;flex-wrap:nowrap}
+    .brand{display:flex;align-items:baseline;gap:14px;text-decoration:none;color:var(--ink);white-space:nowrap;flex-shrink:0}
+    .brand b{font-family:var(--serif);font-weight:900;font-size:26px;letter-spacing:.04em;white-space:nowrap}
+    .brand span{font-family:var(--type);font-size:11px;letter-spacing:.14em;color:var(--stamp);text-transform:uppercase;white-space:nowrap;display:inline-block}
+    nav{display:flex;gap:28px;align-items:center;white-space:nowrap}
+    nav a{font-family:var(--type);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);text-decoration:none;white-space:nowrap}
     nav a:hover{color:var(--stamp)}
     nav a:focus-visible{outline:2px solid var(--stamp);outline-offset:4px}
     .reg-no{font-family:var(--type);font-size:11px;color:var(--ink-soft);letter-spacing:.12em;white-space:nowrap}
@@ -398,11 +477,11 @@ HTML_PAGE = Template("""<!doctype html>
     .chip-x{border:0;background:none;font-size:18px;line-height:1;cursor:pointer;color:var(--ink-soft);padding:2px 6px}
     .chip-x:hover{color:var(--stamp)}
     .mode-row{margin-top:20px;text-align:left}
-    select{
+    select:not(.lang-dropdown){
       width:100%;padding:11px 12px;border:1.5px solid var(--rule);background:var(--card);
       color:var(--ink);font-family:var(--sans);font-size:14px;border-radius:0;
     }
-    select:focus{outline:2px solid var(--stamp);outline-offset:1px}
+    select:not(.lang-dropdown):focus{outline:2px solid var(--stamp);outline-offset:1px}
     .mode-note{font-family:var(--type);font-size:11px;color:var(--ink-soft);letter-spacing:.05em;margin-top:8px}
     .submit-row{margin-top:26px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
     .submit-note{font-family:var(--type);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
@@ -643,16 +722,30 @@ HTML_PAGE = Template("""<!doctype html>
 <header>
   <div class="wrap reg-bar">
     <a class="brand" href="/">
-      <b>MUHAR</b>
-      <span>मुहर &nbsp;·&nbsp; registry console</span>
+      <b>OneBhoomi</b>
+      <span>वनभूमि &nbsp;·&nbsp; registry console</span>
     </a>
     <nav aria-label="Sections">
-      <a href="/">Registry</a>
-      <a href="/dashboard">Dashboard</a>
-      <a href="/new">New Scan</a>
-      <a href="/#sealing">Sealing</a>
-      <a href="/#verify">Verify</a>
+      <a href="/" data-i18n="nav_registry">Registry</a>
+      <a href="/dashboard" data-i18n="nav_dashboard">Dashboard</a>
+      <a href="/new" data-i18n="nav_new_scan">New Scan</a>
+      <a href="/#sealing" data-i18n="nav_sealing">Sealing</a>
+      <a href="/#verify" data-i18n="nav_verify">Verify</a>
     </nav>
+    <div class="lang-picker" title="Change Language">
+            <svg class="lang-svg" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;stroke:var(--stamp);fill:none;flex-shrink:0;display:inline-block;vertical-align:middle;">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="2" y1="12" x2="22" y2="12"></line>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+        </svg>
+            <select id="langSelect" class="lang-dropdown" aria-label="Select Language">
+              <option value="en" selected>English</option>
+              <option value="hi">हिंदी (Hindi)</option>
+              <option value="te">తెలుగు (Telugu)</option>
+              <option value="kn">ಕನ್ನಡ (Kannada)</option>
+              <option value="ta">தமிழ் (Tamil)</option>
+            </select>
+    </div>
     <span class="reg-no">$reg_no</span>
   </div>
 </header>
@@ -665,9 +758,9 @@ $stage_markup
 
 <footer>
   <div class="wrap foot-note">
-    <span>MUHAR · Offline Registry Console</span>
-    <span>Sale Deeds · Agreements · GPA</span>
-    <span>No cloud. No keys leaving the office.</span>
+    <span data-i18n="footer_title">OneBhoomi · Offline Registry Console</span>
+    <span data-i18n="footer_sub">Sale Deeds · Agreements · GPA</span>
+    <span data-i18n="footer_cloud">No cloud. No keys leaving the office.</span>
   </div>
 </footer>
 
@@ -1214,8 +1307,53 @@ $stage_markup
     });
   })();
 </script>
+
+<script>
+const CONSOLE_I18N = {"en": {"nav_registry": "Registry", "nav_dashboard": "Dashboard", "nav_new_scan": "New Scan", "nav_sealing": "Sealing", "nav_verify": "Verify", "console_h1": "Verification <em>Console</em>", "lbl_record": "Record", "badge_extracted": "Extracted", "badge_needs_review": "Needs Review", "badge_ready_for_approval": "Ready for Approval", "badge_approved": "Approved & Sealed", "badge_rejected": "Rejected", "badge_fail": "Checks Failed", "step_scan": "Scan", "step_machine": "Machine Check", "step_clerk": "Clerk Review", "step_seal": "Officer Seal", "lbl_mode": "Mode", "lbl_hardware": "Hardware", "lbl_ocr": "OCR", "lbl_transit": "Transit", "lbl_total": "Total", "lbl_passed": "passed", "lbl_warnings": "warnings", "lbl_failed": "failed", "sched_a_panel_title": "Schedule A · Machine Checklist", "sched_a_sub": "automated", "chk_required_fields_name": "Required Document Fields", "chk_required_fields_msg": "All critical document fields are present.", "chk_area_bounds_name": "Property Area Boundary Validation", "chk_area_bounds_msg": "Property area is valid.", "chk_date_order_name": "Date Parse & Logic Validation", "chk_date_order_msg": "Document and execution dates are logically ordered.", "chk_survey_format_name": "Survey Number Validation", "chk_survey_format_msg": "Survey number format is valid.", "chk_geographic_consistency_name": "Geographic Authority Consistency", "chk_geographic_consistency_msg": "State Authority: VALIDATED via State Registry.", "sched_b_panel_title": "Schedule B · Clerk Review", "sched_b_sub": "correct in place", "clerk_instruction_note": "read each field against the scan, fix what the OCR got wrong, then save or pass it up to the officer.", "f_doc_type": "Document Type", "f_doc_no": "Document Number", "f_survey": "Survey Number", "f_subsurvey": "Sub-Survey Number", "f_area": "Property Area (Sq. Yards)", "f_village": "Village", "f_mandal": "Mandal", "f_district": "District", "f_stamp_no": "Stamp Serial Number", "f_stamp_val": "Stamp Value (₹)", "f_sold_to": "Stamp Sold To", "f_doc_date": "Document Date", "f_exec_date": "Execution Date", "f_parties": "Parties (JSON)", "warn_officer_ok": "Officer approval permanently certifies the reviewed facts and applies the seal.", "btn_save_corrections": "Save Corrections", "btn_officer_approve_seal": "Officer Approve & Seal", "btn_officer_reject": "Officer Reject", "ph_rej_reason": "Rejection reason (required)", "btn_view_cert_qr": "View Standalone Certificate & QR", "footer_title": "OneBhoomi · Offline Registry Console", "footer_sub": "Sale Deeds · Agreements · GPA", "footer_cloud": "No cloud. No keys leaving the office.", "chk_area_validation_name": "Property Area Boundary Validation", "chk_area_validation_msg": "Property area is valid.", "chk_date_validation_name": "Date Parse & Logic Validation", "chk_date_validation_msg": "Document and execution dates are logically ordered.", "chk_survey_number_validation_name": "Survey Number Validation", "chk_survey_number_validation_msg": "Survey number format is valid.", "chk_internal_consistency_name": "Internal Consistency Check", "chk_internal_consistency_msg": "No contradictions found across deed clauses.", "chk_signature_detection_name": "Signature & Stamp Presence", "chk_signature_detection_msg": "Signatures and stamps detected on document scan."}, "hi": {"nav_registry": "रजिस्ट्री", "nav_dashboard": "डैशबोर्ड", "nav_new_scan": "नया स्कैन", "nav_sealing": "डिजिटल मुहर", "nav_verify": "सत्यापन", "console_h1": "सत्यापन <em>कंसोल</em>", "lbl_record": "अभिलेख सं.", "badge_extracted": "निष्कर्षित", "badge_needs_review": "समीक्षा आवश्यक", "badge_ready_for_approval": "मुहर हेतु तैयार", "badge_approved": "अनुमोदित एवं मुहरबंद", "badge_rejected": "अस्वीकृत", "badge_fail": "जांच विफल", "step_scan": "स्कैन", "step_machine": "मशीन चेक", "step_clerk": "क्लर्क समीक्षा", "step_seal": "अधिकारी मुहर", "lbl_mode": "मोड", "lbl_hardware": "हार्डवेयर", "lbl_ocr": "ओसीआर", "lbl_transit": "ट्रांजिट", "lbl_total": "कुल समय", "lbl_passed": "सफल", "lbl_warnings": "चेतावनी", "lbl_failed": "विफल", "sched_a_panel_title": "अनुसूची क · स्वचालित मशीन चेकलिस्ट", "sched_a_sub": "स्वचालित", "chk_required_fields_name": "अनिवार्य दस्तावेज़ फ़ील्ड्स", "chk_required_fields_msg": "सभी महत्वपूर्ण दस्तावेज़ फ़ील्ड्स उपस्थित हैं।", "chk_area_bounds_name": "संपत्ति क्षेत्र सीमा सत्यापन", "chk_area_bounds_msg": "संपत्ति क्षेत्रफल वैध है।", "chk_date_order_name": "तिथि विश्लेषण एवं तार्किक क्रम", "chk_date_order_msg": "दस्तावेज़ एवं निष्पादन तिथियां तार्किक क्रम में हैं।", "chk_survey_format_name": "सर्वेक्षण संख्या सत्यापन", "chk_survey_format_msg": "सर्वेक्षण संख्या प्रारूप कानूनी रूप से मान्य है।", "chk_geographic_consistency_name": "भौगोलिक प्राधिकरण संगतता", "chk_geographic_consistency_msg": "राज्य प्राधिकरण: राज्य रजिस्ट्री द्वारा सत्यापित।", "sched_b_panel_title": "अनुसूची ख · क्लर्क समीक्षा एवं सुधार", "sched_b_sub": "तत्काल सुधारें", "clerk_instruction_note": "स्कैन के आधार पर प्रत्येक फ़ील्ड की जांच करें, ओसीआर त्रुटियों को सुधारें, फिर सहेजें या अनुमोदन हेतु अधिकारी को भेजें।", "f_doc_type": "दस्तावेज़ प्रकार", "f_doc_no": "दस्तावेज़ संख्या", "f_survey": "सर्वेक्षण संख्या", "f_subsurvey": "उप-सर्वेक्षण संख्या", "f_area": "संपत्ति क्षेत्रफल (वर्ग गज)", "f_village": "ग्राम", "f_mandal": "मंडल", "f_district": "ज़िला", "f_stamp_no": "स्टाम्प क्रमांक", "f_stamp_val": "स्टाम्प मूल्य (₹)", "f_sold_to": "स्टाम्प क्रेता", "f_doc_date": "दस्तावेज़ दिनांक", "f_exec_date": "निष्पादन दिनांक", "f_parties": "पक्षकार (JSON)", "warn_officer_ok": "अधिकारी का अनुमोदन तथ्यों को स्थायी रूप से प्रमाणित करता है और डिजिटल मुहर लगाता है।", "btn_save_corrections": "सुधार सहेजें", "btn_officer_approve_seal": "अधिकारी अनुमोदन एवं मुहर", "btn_officer_reject": "अधिकारी अस्वीकृति", "ph_rej_reason": "अस्वीकृति का कारण (अनिवार्य)", "btn_view_cert_qr": "प्रमाणपत्र एवं क्यूआर देखें", "footer_title": "वनभूमि · ऑफ़लाइन रजिस्ट्री कंसोल", "footer_sub": "बिक्री विलेख · अनुबंध · जीपीए", "footer_cloud": "कोई क्लाउड नहीं। कोई भी कुंजी कार्यालय से बाहर नहीं जाती।", "chk_area_validation_name": "संपत्ति क्षेत्र सीमा सत्यापन", "chk_area_validation_msg": "संपत्ति क्षेत्रफल वैध है।", "chk_date_validation_name": "तिथि विश्लेषण एवं तार्किक क्रम", "chk_date_validation_msg": "दस्तावेज़ एवं निष्पादन तिथियां तार्किक क्रम में हैं।", "chk_survey_number_validation_name": "सर्वेक्षण संख्या सत्यापन", "chk_survey_number_validation_msg": "सर्वेक्षण संख्या प्रारूप कानूनी रूप से मान्य है।", "chk_internal_consistency_name": "आंतरिक संगति जांच", "chk_internal_consistency_msg": "विलेख शर्तों में कोई अंतर्विरोध नहीं मिला।", "chk_signature_detection_name": "हस्ताक्षर एवं स्टाम्प उपस्थिति", "chk_signature_detection_msg": "दस्तावेज़ स्कैन पर हस्ताक्षर एवं स्टाम्प की पुष्टि हुई।"}, "te": {"nav_registry": "రిజిస్ట్రీ", "nav_dashboard": "డ్యాష్‌బోర్డ్", "nav_new_scan": "కొత్త స్కాన్", "nav_sealing": "డిజిటల్ ముద్ర", "nav_verify": "ధృవీకరణ", "console_h1": "ధృవీకరణ <em>కన్సోల్</em>", "lbl_record": "రికార్డు సంఖ్య", "badge_extracted": "సేకరించబడింది", "badge_needs_review": "సమీక్ష అవసరం", "badge_ready_for_approval": "ముద్రకు సిద్ధం", "badge_approved": "ఆమోదించబడి & సీల్ చేయబడింది", "badge_rejected": "తిరస్కరించబడింది", "badge_fail": "తనిఖీ విఫలమైంది", "step_scan": "స్కాన్", "step_machine": "మెషిన్ చెక్", "step_clerk": "క్లర్క్ సమీక్ష", "step_seal": "అధికారి ముద్ర", "lbl_mode": "మోడ్", "lbl_hardware": "హార్డ్‌వేర్", "lbl_ocr": "OCR", "lbl_transit": "రవాణా", "lbl_total": "మొత్తం సమయం", "lbl_passed": "విజయవంతం", "lbl_warnings": "హెచ్చరికలు", "lbl_failed": "విఫలమైనవి", "sched_a_panel_title": "షెడ్యూల్ A · ఆటోమేటెడ్ మెషిన్ చెక్‌లిస్ట్", "sched_a_sub": "ఆటోమేటెడ్", "chk_required_fields_name": "అవసరమైన పత్రం ఫీల్డులు", "chk_required_fields_msg": "అన్ని ముఖ్యమైన ఫీల్డులు ఉన్నాయి.", "chk_area_bounds_name": "ఆస్తి విస్తీర్ణం సరిహద్దు తనిఖీ", "chk_area_bounds_msg": "ఆస్తి విస్తీర్ణం చట్టబద్ధంగా ఉంది.", "chk_date_order_name": "తేదీల విశ్లేషణ & తార్కిక క్రమం", "chk_date_order_msg": "దస్తావేజు మరియు అమలు తేదీలు సరైన క్రమంలో ఉన్నాయి.", "chk_survey_format_name": "సర్వే నంబర్ ధృవీకరణ", "chk_survey_format_msg": "సర్వే నంబర్ సరైన ఫార్మాట్‌లో ఉంది.", "chk_geographic_consistency_name": "భౌగోళిక స్థానిక సరిపోలిక", "chk_geographic_consistency_msg": "స్టేట్ అథారిటీ: అధికారిక రిజిస్ట్రీ ద్వారా ధృవీకరించబడింది.", "sched_b_panel_title": "షెడ్యూల్ B · క్లర్క్ సమీక్ష & సవరణ", "sched_b_sub": "ఇక్కడే సవరించండి", "clerk_instruction_note": "స్కాన్ చేసిన పత్రంతో ప్రతి ఫీల్డ్‌ను సరిచూడండి, తప్పులను సరిదిద్దండి, ఆపై భద్రపరచండి లేదా అధికారికి పంపండి.", "f_doc_type": "పత్రం రకం", "f_doc_no": "పత్రం సంఖ్య", "f_survey": "సర్వే నంబర్", "f_subsurvey": "సబ్-సర్వే నంబర్", "f_area": "ఆస్తి విస్తీర్ణం (గజాలు)", "f_village": "గ్రామం", "f_mandal": "మండలం", "f_district": "జిల్లా", "f_stamp_no": "స్టాంప్ సీరియల్ సంఖ్య", "f_stamp_val": "స్టాంప్ విలువ (₹)", "f_sold_to": "స్టాంప్ కొనుగోలుదారు", "f_doc_date": "పత్రం తేదీ", "f_exec_date": "అమలు తేదీ", "f_parties": "పార్టీలు (JSON)", "warn_officer_ok": "అధికారి ఆమోదం రికార్డును శాశ్వతంగా లాక్ చేసి డిజిటల్ సీల్ వేస్తుంది.", "btn_save_corrections": "సవరణలను భద్రపరచండి", "btn_officer_approve_seal": "అధికారి ఆమోదం & ముద్ర", "btn_officer_reject": "అధికారి తిరస్కరణ", "ph_rej_reason": "తిరస్కరణకు కారణం (తప్పనిసరి)", "btn_view_cert_qr": "ధృవీకరణ పత్రం & QR చూడండి", "footer_title": "వన్‌భూమి · ఆఫ్‌లైన్ రిజిస్ట్రీ కన్సోల్", "footer_sub": "సేల్ డీడ్‌లు · ఒప్పందాలు · GPA", "footer_cloud": "క్లౌడ్ లేదు. కార్యాలయం నుండి కీలు ఎక్కడికీ వెళ్లవు.", "chk_area_validation_name": "ఆస్తి విస్తీర్ణం సరిహద్దు తనిఖీ", "chk_area_validation_msg": "ఆస్తి విస్తీర్ణం చట్టబద్ధంగా ఉంది.", "chk_date_validation_name": "తేదీల విశ్లేషణ & తార్కిక క్రమం", "chk_date_validation_msg": "దస్తావేజు మరియు అమలు తేదీలు సరైన క్రమంలో ఉన్నాయి.", "chk_survey_number_validation_name": "సర్వే నంబర్ ధృవీకరణ", "chk_survey_number_validation_msg": "సర్వే నంబర్ సరైన ఫార్మాట్‌లో ఉంది.", "chk_internal_consistency_name": "అంతర్గత స్థిరత్వ తనిఖీ", "chk_internal_consistency_msg": "నిబంధనలలో ఎటువంటి వైరుధ్యాలు కనుగొనబడలేదు.", "chk_signature_detection_name": "సంతకం మరియు స్టాంప్ గుర్తింపు", "chk_signature_detection_msg": "స్కాన్ పత్రంలో సంతకాలు మరియు స్టాంపులు గుర్తించబడ్డాయి."}, "kn": {"nav_registry": "ನೋಂದಣಿ", "nav_dashboard": "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್", "nav_new_scan": "ಹೊಸ ಸ್ಕ್ಯಾನ್", "nav_sealing": "ಡಿಜಿಟಲ್ ಮುದ್ರೆ", "nav_verify": "ಪರಿಶೀಲನೆ", "console_h1": "ಪರಿಶೀಲನಾ <em>ಕನ್ಸೋಲ್</em>", "lbl_record": "ದಾಖಲೆ ಸಂಖ್ಯೆ", "badge_extracted": "ಹೊರತೆಗೆಯಲಾಗಿದೆ", "badge_needs_review": "ಪರಿಶೀಲನೆ ಅಗತ್ಯವಿದೆ", "badge_ready_for_approval": "ಮುದ್ರೆಗೆ ಸಿದ್ಧ", "badge_approved": "ಅನುಮೋದಿಸಿ ಮುದ್ರೆ ಹಾಕಲಾಗಿದೆ", "badge_rejected": "ತಿರಸ್ಕರಿಸಲಾಗಿದೆ", "badge_fail": "ಪರಿಶೀಲನೆ ವಿಫಲ", "step_scan": "ಸ್ಕ್ಯಾನ್", "step_machine": "ಯಂತ್ರ ತಪಾಸಣೆ", "step_clerk": "ಗುಮಾಸ್ತರ ಪರಿಶೀಲನೆ", "step_seal": "ಅಧಿಕಾರಿಯ ಮುದ್ರೆ", "lbl_mode": "ಮೋಡ್", "lbl_hardware": "ಯಂತ್ರಾಂಶ", "lbl_ocr": "OCR", "lbl_transit": "ರವಾನೆ", "lbl_total": "ಒಟ್ಟು ಸಮಯ", "lbl_passed": "ಯಶಸ್ವಿ", "lbl_warnings": "ಎಚ್ಚರಿಕೆಗಳು", "lbl_failed": "ವಿಫಲ", "sched_a_panel_title": "ಹಂತ A · ಸ್ವಯಂಚಾಲಿತ ಯಂತ್ರ ಪರಿಶೀಲನಾಪಟ್ಟಿ", "sched_a_sub": "ಸ್ವಯಂಚಾಲಿತ", "chk_required_fields_name": "ಅಗತ್ಯವಿರುವ ದಾಖಲೆ ಕ್ಷೇತ್ರಗಳು", "chk_required_fields_msg": "ಎಲ್ಲಾ ಪ್ರಮುಖ ಕ್ಷೇತ್ರಗಳು ಲಭ್ಯವಿವೆ.", "chk_area_bounds_name": "ವಿಸ್ತೀರ್ಣ ಮಿತಿ ಪರಿಶೀಲನೆ", "chk_area_bounds_msg": "ಆಸ್ತಿ ವಿಸ್ತೀರ್ಣ ಮಾನ್ಯವಾಗಿದೆ.", "chk_date_order_name": "ದಿನಾಂಕಗಳ ಕ್ರಮಬದ್ಧತೆ ಪರಿಶೀಲನೆ", "chk_date_order_msg": "ದಾಖಲೆ ದಿನಾಂಕಗಳು ಸರಿಯಾದ ಕ್ರಮದಲ್ಲಿವೆ.", "chk_survey_format_name": "ಸರ್ವೇ ಸಂಖ್ಯೆ ಪರಿಶೀಲನೆ", "chk_survey_format_msg": "ಸರ್ವೇ ಸಂಖ್ಯೆ ಮಾದರಿ ಕಾನೂನುಬದ್ಧವಾಗಿದೆ.", "chk_geographic_consistency_name": "ಭೌಗೋಳಿಕ ತಾಳೆ ಪರಿಶೀಲನೆ", "chk_geographic_consistency_msg": "ರಾಜ್ಯ ಪ್ರಾಧಿಕಾರ: ಅಧಿಕೃತ ನೋಂದಣಿಯಿಂದ ದೃಢೀಕರಿಸಲಾಗಿದೆ.", "sched_b_panel_title": "ಹಂತ B · ಸಿಬ್ಬಂದಿ ಪರಿಶೀಲನೆ & ತಿದ್ದುಪಡಿ", "sched_b_sub": "ಇಲ್ಲಿಯೇ ಸರಿಪಡಿಸಿ", "clerk_instruction_note": "ಸ್ಕ್ಯಾನ್ ಮಾಡಿದ ಪ್ರತಿಯೊಂದಿಗೆ ತಾಳೆ ನೋಡಿ, ತಪ್ಪುಗಳನ್ನು ಸರಿಪಡಿಸಿ, ನಂತರ ಉಳಿಸಿ ಅಥವಾ ಅಧಿಕಾರಿಗೆ ಸಲ್ಲಿಸಿ.", "f_doc_type": "ದಾಖಲೆಯ ಪ್ರಕಾರ", "f_doc_no": "ದಾಖಲೆ ಸಂಖ್ಯೆ", "f_survey": "ಸರ್ವೇ ಸಂಖ್ಯೆ", "f_subsurvey": "ಉಪ-ಸರ್ವೇ ಸಂಖ್ಯೆ", "f_area": "ಆಸ್ತಿ ವಿಸ್ತೀರ್ಣ (ಚದರ ಗಜ)", "f_village": "ಗ್ರಾಮ", "f_mandal": "ಹೋಬಳಿ", "f_district": "ಜಿಲ್ಲೆ", "f_stamp_no": "ಮುದ್ರಾಂಕ ಸಂಖ್ಯೆ", "f_stamp_val": "ಮುದ್ರಾಂಕ ಮೌಲ್ಯ (₹)", "f_sold_to": "ಖರೀದಿದಾರರ ಹೆಸರು", "f_doc_date": "ದಾಖಲೆ ದಿನಾಂಕ", "f_exec_date": "ನೋಂದಣಿ ದಿನಾಂಕ", "f_parties": "ಪಕ್ಷಗಾರರ ವಿವರ (JSON)", "warn_officer_ok": "ಅಧಿಕಾರಿಯ ಅನುಮೋದನೆಯು ದಾಖಲೆಯನ್ನು ಅಂತಿಮಗೊಳಿಸಿ ಡಿಜಿಟಲ್ ಮುದ್ರೆ ಹಾಕುತ್ತದೆ.", "btn_save_corrections": "ತಿದ್ದುಪಡಿ ಉಳಿಸಿ", "btn_officer_approve_seal": "ಅಧಿಕಾರಿ ಅನುಮೋದನೆ & ಮುದ್ರೆ", "btn_officer_reject": "ಅಧಿಕಾರಿ ತಿರಸ್ಕಾರ", "ph_rej_reason": "ತಿರಸ್ಕಾರಕ್ಕೆ ಕಾರಣ (ಕಡ್ಡಾಯ)", "btn_view_cert_qr": "ಪ್ರಮಾಣಪತ್ರ & QR ವೀಕ್ಷಿಸಿ", "footer_title": "ವನ್‌ಭೂಮಿ · ಆಫ್‌ಲೈನ್ ನೋಂದಣಿ ಕನ್ಸೋಲ್", "footer_sub": "ಮಾರಾಟ ಪತ್ರಗಳು · ಒಪ್ಪಂದಗಳು · ಜಿಪಿಎ", "footer_cloud": "ಯಾವುದೇ ಕ್ಲೌಡ್ ಇಲ್ಲ. ಕಚೇರಿಯಿಂದ ಕೀಗಳು ಹೊರಹೋಗುವುದಿಲ್ಲ.", "chk_area_validation_name": "ವಿಸ್ತೀರ್ಣ ಮಿತಿ ಪರಿಶೀಲನೆ", "chk_area_validation_msg": "ಆಸ್ತಿ ವಿಸ್ತೀರ್ಣ ಮಾನ್ಯವಾಗಿದೆ.", "chk_date_validation_name": "ದಿನಾಂಕಗಳ ಕ್ರಮಬದ್ಧತೆ ಪರಿಶೀಲನೆ", "chk_date_validation_msg": "ದಾಖಲೆ ದಿನಾಂಕಗಳು ಸರಿಯಾದ ಕ್ರಮದಲ್ಲಿವೆ.", "chk_survey_number_validation_name": "ಸರ್ವೇ ಸಂಖ್ಯೆ ಪರಿಶೀಲನೆ", "chk_survey_number_validation_msg": "ಸರ್ವೇ ಸಂಖ್ಯೆ ಮಾದರಿ ಕಾನೂನುಬದ್ಧವಾಗಿದೆ.", "chk_internal_consistency_name": "ಆಂತರಿಕ ಸುಸಂಗತತೆ ಪರಿಶೀಲನೆ", "chk_internal_consistency_msg": "ಷರತ್ತುಗಳಲ್ಲಿ ಯಾವುದೇ ವಿರೋಧಾಭಾಸಗಳು ಕಂಡುಬಂದಿಲ್ಲ.", "chk_signature_detection_name": "ಸಹಿ ಮತ್ತು ಮುದ್ರಾಂಕ ಪರಿಶೀಲನೆ", "chk_signature_detection_msg": "ಸ್ಕ್ಯಾನ್ ಪ್ರತಿಯಲ್ಲಿ ಸಹಿ ಮತ್ತು ಮುದ್ರಾಂಕಗಳು ದೃಢಪಟ್ಟಿವೆ."}, "ta": {"nav_registry": "பதிவேடு", "nav_dashboard": "டாஷ்போர்டு", "nav_new_scan": "புதிய ஸ்கேன்", "nav_sealing": "டிஜிட்டல் முத்திரை", "nav_verify": "சரிபார்ப்பு", "console_h1": "சரிபார்ப்பு <em>கன்சோல்</em>", "lbl_record": "பதிவு எண்", "badge_extracted": "பிரித்தெடுக்கப்பட்டது", "badge_needs_review": "மதிப்பாய்வு தேவை", "badge_ready_for_approval": "முத்திரைக்கு தயார்", "badge_approved": "ஒப்புதல் அளிக்கப்பட்டு முத்திரையிடப்பட்டது", "badge_rejected": "நிராகரிக்கப்பட்டது", "badge_fail": "சரிபார்ப்பு தோல்வி", "step_scan": "ஸ்கேன்", "step_machine": "இயந்திர சரிபார்ப்பு", "step_clerk": "எழுத்தர் மதிப்பாய்வு", "step_seal": "அதிகாரி முத்திரை", "lbl_mode": "முறைமை", "lbl_hardware": "வன்பொருள்", "lbl_ocr": "OCR", "lbl_transit": "போக்குவரத்து", "lbl_total": "மொத்த நேரம்", "lbl_passed": "வெற்றி", "lbl_warnings": "எச்சரிக்கைகள்", "lbl_failed": "தோல்வி", "sched_a_panel_title": "அட்டவணை A · தானியங்கி இயந்திர சரிபார்ப்பு பட்டியல்", "sched_a_sub": "தானியங்கி", "chk_required_fields_name": "தேவையான ஆவணப் புலங்கள்", "chk_required_fields_msg": "அனைத்து முக்கிய புலங்களும் உள்ளன.", "chk_area_bounds_name": "நிலப் பரப்பளவு எல்லைச் சரிபார்ப்பு", "chk_area_bounds_msg": "பரப்பளவு செல்லுபடியாகும்.", "chk_date_order_name": "தேதி பகுப்பாய்வு & தர்க்கரீதியான வரிசை", "chk_date_order_msg": "ஆவணத் தேதிகள் சரியான வரிசையில் உள்ளன.", "chk_survey_format_name": "சர்வே எண் சரிபார்ப்பு", "chk_survey_format_msg": "சர்வே எண் வடிவம் சட்டப்பூர்வமானது.", "chk_geographic_consistency_name": "இடஞ்சார்ந்த அதிகாரப் பொருத்தம்", "chk_geographic_consistency_msg": "அரசு அதிகாரம்: அதிகாரப்பூர்வ பதிவேடு மூலம் உறுதிப்படுத்தப்பட்டது.", "sched_b_panel_title": "அட்டவணை B · எழுத்தர் மதிப்பாய்வு & திருத்தம்", "sched_b_sub": "இங்கேயே திருத்துக", "clerk_instruction_note": "ஸ்கேன் செய்யப்பட்ட ஆவணத்துடன் ஒப்பிட்டு பிழைகளைத் திருத்துக, பின்னர் சேமிக்கவும் அல்லது அதிகாரிக்கு சமர்ப்பிக்கவும்.", "f_doc_type": "ஆவண வகை", "f_doc_no": "ஆவண எண்", "f_survey": "சர்வே எண்", "f_subsurvey": "உட்பிரிவு சர்வே எண்", "f_area": "சொத்து பரப்பளவு (சதுர கெஜம்)", "f_village": "கிராமம்", "f_mandal": "மண்டலம்", "f_district": "மாவட்டம்", "f_stamp_no": "முத்திரைத்தாள் எண்", "f_stamp_val": "முத்திரை மதிப்பு (₹)", "f_sold_to": "வாங்குபவர் பெயர்", "f_doc_date": "ஆவண தேதி", "f_exec_date": "நிறைவேற்றப்பட்ட தேதி", "f_parties": "நபர்கள் (JSON)", "warn_officer_ok": "அதிகாரியின் ஒப்புதல் ஆவணத்தை உறுதிசெய்து டிஜிட்டல் முத்திரையிடுகிறது.", "btn_save_corrections": "திருத்தங்களை சேமிக்கவும்", "btn_officer_approve_seal": "அதிகாரி ஒப்புதல் & முத்திரை", "btn_officer_reject": "அதிகாரி நிராகரிப்பு", "ph_rej_reason": "நிராகரிப்புக்கான காரணம் (கட்டாயம்)", "btn_view_cert_qr": "சான்றிதழ் & QR பார்க்க", "footer_title": "ஒன்பூமி · ஆஃப்லைன் பதிவேடு கன்சோல்", "footer_sub": "விற்பனைப் பத்திரங்கள் · ஒப்பந்தங்கள் · ஜிபிஏ", "footer_cloud": "கிளவுட் இல்லை. விசைகள் அலுவலகத்தை விட்டு வெளியேறாது.", "chk_area_validation_name": "நிலப் பரப்பளவு எல்லைச் சரிபார்ப்பு", "chk_area_validation_msg": "பரப்பளவு செல்லுபடியாகும்.", "chk_date_validation_name": "தேதி பகுப்பாய்வு & தர்க்கரீதியான வரிசை", "chk_date_validation_msg": "ஆவணத் தேதிகள் சரியான வரிசையில் உள்ளன.", "chk_survey_number_validation_name": "சர்வே எண் சரிபார்ப்பு", "chk_survey_number_validation_msg": "சர்வே எண் வடிவம் சட்டப்பூர்வமானது.", "chk_internal_consistency_name": "உள் நிலைத்தன்மை சரிபார்ப்பு", "chk_internal_consistency_msg": "பத்திரப் பிரிவுகளில் முரண்பாடுகள் எதுவும் இல்லை.", "chk_signature_detection_name": "கையொப்பம் மற்றும் முத்திரை சரிபார்ப்பு", "chk_signature_detection_msg": "ஸ்கேன் செய்யப்பட்ட ஆவணத்தில் கையொப்பங்கள் மற்றும் முத்திரைகள் உறுதிசெய்யப்பட்டன."}};
+
+function applyConsoleLanguage(lang) {
+  if (!CONSOLE_I18N[lang]) lang = 'en';
+  document.documentElement.lang = lang;
+  try { localStorage.setItem('onebhoomi_lang', lang); } catch(e) {}
+
+  const select = document.getElementById('langSelect');
+  if (select && select.value !== lang) select.value = lang;
+
+  const dict = CONSOLE_I18N[lang] || CONSOLE_I18N['en'];
+
+  // 1. Text elements
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (dict[key] !== undefined) {
+      el.innerHTML = dict[key];
+    }
+  });
+
+  // 2. Placeholders
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+    const key = el.getAttribute('data-i18n-ph');
+    if (dict[key] !== undefined) {
+      el.setAttribute('placeholder', dict[key]);
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  let savedLang = 'en';
+  try { savedLang = localStorage.getItem('onebhoomi_lang') || 'en'; } catch(e) {}
+  applyConsoleLanguage(savedLang);
+
+  const sel = document.getElementById('langSelect');
+  if (sel) {
+    sel.addEventListener('change', (e) => {
+      applyConsoleLanguage(e.target.value);
+    });
+  }
+});
+</script>
 </body>
 </html>
+
 """)
 
 
@@ -1416,7 +1554,7 @@ BADGE_LABELS = {
 
 def _badge_markup(status: str) -> str:
     label = BADGE_LABELS.get(status, status.replace("_", " ").title())
-    return f'<span class="badge b-{html.escape(status.lower())}">{html.escape(label)}</span>'
+    return f'<span class="badge b-{html.escape(status.lower())}" data-i18n="badge_{status.lower()}">{html.escape(label)}</span>'
 
 
 def _stepper_markup(status: str) -> str:
@@ -1434,12 +1572,13 @@ def _stepper_markup(status: str) -> str:
         labels = ["Scan", "Machine check", "Clerk review", "Officer seal"]
 
     glyphs = ["i", "ii", "iii", "iv"]
+    step_keys = ["step_scan", "step_machine", "step_clerk", "step_seal"]
     items = []
-    for glyph, label, st in zip(glyphs, labels, states):
+    for glyph, label, st, skey in zip(glyphs, labels, states, step_keys):
         cls = f"step {st}" if st else "step"
         items.append(
             f'<div class="{cls}"><div class="dot">{glyph}</div>'
-            f'<div class="lbl">{label}</div></div>'
+            f'<div class="lbl" data-i18n="{skey}">{label}</div></div>'
         )
     return f'<div class="stepper rv in" role="list" aria-label="Progress">{"".join(items)}</div>'
 
@@ -1541,21 +1680,21 @@ def _checklist_panel(checks: list) -> str:
             <div class="{row_cls}">
               <span class="g {glyph_cls}">{glyph}</span>
               <div>
-                <p class="t">{html.escape(chk_name)}{sev}</p>
-                <p class="m">{html.escape(chk_msg)}</p>
+                <p class="t" data-i18n="chk_{c.get('check_id', '')}_name">{html.escape(chk_name)}{sev}</p>
+                <p class="m" data-i18n="chk_{c.get('check_id', '')}_msg">{html.escape(chk_msg)}</p>
               </div>
             </div>
             """
         )
 
     summary = (
-        f'<span class="ok">{counts.get("PASS", 0)} passed</span> · '
-        f'<span class="md">{counts.get("WARNING", 0)} warnings</span> · '
-        f'<span class="no">{counts.get("FAIL", 0)} failed</span>'
+        f'<span class="ok">{counts.get("PASS", 0)} <span data-i18n="lbl_passed">passed</span></span> · '
+        f'<span class="md">{counts.get("WARNING", 0)} <span data-i18n="lbl_warnings">warnings</span></span> · '
+        f'<span class="no">{counts.get("FAIL", 0)} <span data-i18n="lbl_failed">failed</span></span>'
     )
     return f"""
     <section class="panel checklist-panel rv" style="margin-top:24px; margin-bottom:28px;">
-      <div class="tab"><span>Schedule A · Machine Checklist</span><em>automated</em></div>
+      <div class="tab"><span data-i18n="sched_a_panel_title">Schedule A · Machine Checklist</span><em data-i18n="sched_a_sub">automated</em></div>
       <div class="body">
         <div class="checklist checklist-grid">{''.join(rows)}</div>
         <p class="check-sum" style="margin-top:16px;">{summary}</p>
@@ -1586,6 +1725,11 @@ def _clerk_panel(record: dict, message: str) -> str:
     parties = payload_data.get("parties", []) or []
     parties_json_str = json.dumps(parties, ensure_ascii=False)
 
+    current_status = record.get("status")
+    is_approved = current_status == "APPROVED"
+    is_rejected = current_status == "REJECTED"
+    readonly_attr = "readonly" if is_approved else ""
+
     has_critical_fail = any(
         c.get("status") == "FAIL" and c.get("severity") == "critical" for c in checks
     )
@@ -1596,88 +1740,121 @@ def _clerk_panel(record: dict, message: str) -> str:
         )
         approve_disabled = "disabled"
     else:
-        warn = '<p class="warnbox ok">Officer approval permanently certifies the reviewed facts and applies the seal.</p>'
+        warn = '<p class="warnbox ok" data-i18n="warn_officer_ok">Officer approval permanently certifies the reviewed facts and applies the seal.</p>'
         approve_disabled = ""
 
-    action_buttons = f"""
-      <div class="action-panel">
-        {warn}
-        <button type="submit" name="action" value="correct" class="btn btn-ghost">Save Corrections</button>
-        <button type="submit" name="action" value="approve" class="btn btn-green" {approve_disabled}>Officer Approve &amp; Seal</button>
-        <div class="reject-group">
-          <input type="text" name="rejection_reason" id="rejection_reason" placeholder="Rejection reason (required)" aria-label="Rejection reason">
-          <button type="submit" name="action" value="reject" class="btn btn-outline-red"
-            onclick="if(!document.getElementById('rejection_reason').value.trim()) {{ alert('Please provide a rejection reason.'); return false; }}">Officer Reject</button>
+    if is_approved:
+        approved_at = record.get("approved_at", "Certified")
+        action_buttons = f"""
+        <div class="action-panel">
+          <p class="warnbox ok" style="border-left-color:var(--green)">
+            🔒 <b>Officially Approved &amp; Cryptographically Sealed ({html.escape(approved_at)})</b><br>
+            This document has been certified with RSA-PSS 2048-bit. Document facts are locked and immutable.
+          </p>
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+            <a href="/?verification_id={html.escape(rec_id)}" target="_blank" class="btn btn-green" data-i18n="btn_view_cert_qr">View Standalone Certificate &amp; QR</a>
+            <div class="reject-group" style="margin-left:auto;">
+              <input type="text" name="rejection_reason" id="rejection_reason" placeholder="Reason to revoke approval (required)" aria-label="Rejection reason">
+              <button type="submit" name="action" value="reject" class="btn btn-outline-red" data-i18n="btn_officer_reject"
+                onclick="if(!document.getElementById('rejection_reason').value.trim()) {{ alert('Please provide a reason to revoke approval.'); return false; }} return confirm('Are you sure you want to revoke the certified seal and reject this record?');">Revoke / Officer Reject</button>
+            </div>
+          </div>
         </div>
-      </div>
-    """
+        """
+    elif is_rejected:
+        rejected_at = record.get("rejected_at", "On file")
+        rej_reason = record.get("rejection_reason", "No reason provided")
+        action_buttons = f"""
+        <div class="action-panel">
+          <p class="warnbox stop">
+            ❌ <b>Document Rejected by Officer ({html.escape(rejected_at)})</b><br>
+            <b>Reason:</b> {html.escape(rej_reason)}<br>
+            Review and correct the flagged fields below, then save or re-submit for officer approval.
+          </p>
+          <button type="submit" name="action" value="correct" class="btn btn-ghost" data-i18n="btn_save_corrections">Save Corrections</button>
+          <button type="submit" name="action" value="approve" class="btn btn-green" {approve_disabled}>Re-Approve &amp; Seal</button>
+        </div>
+        """
+    else:
+        action_buttons = f"""
+        <div class="action-panel">
+          {warn}
+          <button type="submit" name="action" value="correct" class="btn btn-ghost">Save Corrections</button>
+          <button type="submit" name="action" value="approve" class="btn btn-green" {approve_disabled} data-i18n="btn_officer_approve_seal">Officer Approve &amp; Seal</button>
+          <div class="reject-group">
+            <input type="text" name="rejection_reason" id="rejection_reason" placeholder="Rejection reason (required)" data-i18n-ph="ph_rej_reason" aria-label="Rejection reason">
+            <button type="submit" name="action" value="reject" class="btn btn-outline-red"
+              onclick="if(!document.getElementById('rejection_reason').value.trim()) {{ alert('Please provide a rejection reason.'); return false; }}">Officer Reject</button>
+          </div>
+        </div>
+        """
 
     blocked = ""
 
     return f"""
     <section class="panel clerk rv">
-      <div class="tab"><span>Schedule B · Clerk Review</span><em>correct in place</em></div>
+      <div class="tab"><span data-i18n="sched_b_panel_title">Schedule B · Clerk Review</span><em data-i18n="sched_b_sub">correct in place</em></div>
       <div class="body">
         {blocked}
-        <p class="note">Record {html.escape(rec_id)} · read each field against the scan, fix what the OCR got wrong, then save or pass it up to the officer.</p>
+        <p class="note"><span data-i18n="lbl_record">Record</span> {html.escape(rec_id)} · <span data-i18n="clerk_instruction_note">read each field against the scan, fix what the OCR got wrong, then save or pass it up to the officer.</span></p>
         <form action="/extract" method="post" enctype="multipart/form-data">
           <input type="hidden" name="verification_id" value="{html.escape(rec_id)}">
           <div class="editor-grid">
             <div class="editor-field">
-              <label for="f_doc_type">Document Type</label>
-              <input type="text" id="f_doc_type" name="document_type" value="{html.escape(str(payload_data.get('document_type') or ''))}">
+              <label for="f_doc_type" data-i18n="f_doc_type">Document Type</label>
+              <input type="text" id="f_doc_type" name="document_type" value="{html.escape(str(payload_data.get('document_type') or ''))}" {readonly_attr}>
             </div>
             <div class="editor-field">
-              <label for="f_doc_no">Document Number</label>
-              <input type="text" id="f_doc_no" name="document_number" value="{html.escape(str(payload_data.get('document_number') or ''))}">
+              <label for="f_doc_no" data-i18n="f_doc_no">Document Number</label>
+              <input type="text" id="f_doc_no" name="document_number" value="{html.escape(str(payload_data.get('document_number') or ''))}" {readonly_attr}>
             </div>
             <div class="editor-field">
-              <label for="f_survey">Survey Number</label>
-              <input type="text" id="f_survey" name="survey_number" value="{html.escape(str(prop.get('survey_number') or ''))}">
+              <label for="f_survey" data-i18n="f_survey">Survey Number</label>
+              <input type="text" id="f_survey" name="survey_number" value="{html.escape(str(prop.get('survey_number') or ''))}" {readonly_attr}>
             </div>
             <div class="editor-field">
-              <label for="f_subsurvey">Sub-Survey Number</label>
-              <input type="text" id="f_subsurvey" name="sub_survey_number" value="{html.escape(str(prop.get('sub_survey_number') or ''))}">
+              <label for="f_subsurvey" data-i18n="f_subsurvey">Sub-Survey Number</label>
+              <input type="text" id="f_subsurvey" name="sub_survey_number" value="{html.escape(str(prop.get('sub_survey_number') or ''))}" {readonly_attr}>
             </div>
             <div class="editor-field">
-              <label for="f_area">Property Area</label>
-              <input type="text" id="f_area" name="area" value="{html.escape(str(prop.get('area') if prop.get('area') is not None else ''))}">
+              <label for="f_area" data-i18n="f_area">Property Area</label>
+              <input type="text" id="f_area" name="area" value="{html.escape(str(prop.get('area') if prop.get('area') is not None else ''))}" {readonly_attr}>
             </div>
             <div class="editor-field">
-              <label for="f_village">Village</label>
-              <input type="text" id="f_village" name="village" value="{html.escape(str(prop.get('village') or ''))}">
+              <label for="f_village" data-i18n="f_village">Village</label>
+              <input type="text" id="f_village" name="village" value="{html.escape(str(prop.get('village') or ''))}" {readonly_attr}>
             </div>
             <div class="editor-field">
-              <label for="f_mandal">Mandal</label>
-              <input type="text" id="f_mandal" name="mandal" value="{html.escape(str(prop.get('mandal') or ''))}">
+              <label for="f_mandal" data-i18n="f_mandal">Mandal</label>
+              <input type="text" id="f_mandal" name="mandal" value="{html.escape(str(prop.get('mandal') or ''))}" {readonly_attr}>
             </div>
             <div class="editor-field">
-              <label for="f_district">District</label>
-              <input type="text" id="f_district" name="district" value="{html.escape(str(prop.get('district') or ''))}">
+              <label for="f_district" data-i18n="f_district">District</label>
+              <input type="text" id="f_district" name="district" value="{html.escape(str(prop.get('district') or ''))}" {readonly_attr}>
             </div>
             <div class="editor-field">
-              <label for="f_stamp_no">Stamp Serial Number</label>
-              <input type="text" id="f_stamp_no" name="stamp_number" value="{html.escape(str(stamp.get('stamp_number') or payload_data.get('stamp_number') or ''))}">
+              <label for="f_stamp_no" data-i18n="f_stamp_no">Stamp Serial Number</label>
+              <input type="text" id="f_stamp_no" name="stamp_number" value="{html.escape(str(stamp.get('stamp_number') or payload_data.get('stamp_number') or ''))}" {readonly_attr}>
             </div>
             <div class="editor-field">
-              <label for="f_stamp_val">Stamp Value</label>
-              <input type="text" id="f_stamp_val" name="stamp_value" value="{html.escape(str(stamp.get('stamp_value') if stamp.get('stamp_value') is not None else (payload_data.get('stamp_value') if payload_data.get('stamp_value') is not None else '')))}">
+              <label for="f_stamp_val" data-i18n="f_stamp_val">Stamp Value</label>
+              <input type="text" id="f_stamp_val" name="stamp_value" value="{html.escape(str(stamp.get('stamp_value') if stamp.get('stamp_value') is not None else (payload_data.get('stamp_value') if payload_data.get('stamp_value') is not None else '')))}" {readonly_attr}>
             </div>
             <div class="editor-field">
-              <label for="f_sold_to">Stamp Sold To</label>
-              <input type="text" id="f_sold_to" name="sold_to" value="{html.escape(str(stamp.get('sold_to') or ''))}">
+              <label for="f_sold_to" data-i18n="f_sold_to">Stamp Sold To</label>
+              <input type="text" id="f_sold_to" name="sold_to" value="{html.escape(str(stamp.get('sold_to') or ''))}" {readonly_attr}>
             </div>
             <div class="editor-field">
-              <label for="f_doc_date">Document Date</label>
-              <input type="text" id="f_doc_date" name="document_date" value="{html.escape(str(payload_data.get('document_date') or ''))}">
+              <label for="f_doc_date" data-i18n="f_doc_date">Document Date</label>
+              <input type="text" id="f_doc_date" name="document_date" value="{html.escape(str(payload_data.get('document_date') or ''))}" {readonly_attr}>
             </div>
             <div class="editor-field">
-              <label for="f_exec_date">Execution Date</label>
-              <input type="text" id="f_exec_date" name="execution_date" value="{html.escape(str(payload_data.get('execution_date') or ''))}">
+              <label for="f_exec_date" data-i18n="f_exec_date">Execution Date</label>
+              <input type="text" id="f_exec_date" name="execution_date" value="{html.escape(str(payload_data.get('execution_date') or ''))}" {readonly_attr}>
             </div>
             <div class="editor-field efull">
-              <label for="f_parties">Parties (JSON)</label>
-              <textarea id="f_parties" name="parties_json" rows="3">{html.escape(parties_json_str)}</textarea>
+              <label for="f_parties" data-i18n="f_parties">Parties (JSON)</label>
+              <textarea id="f_parties" name="parties_json" rows="3" {readonly_attr}>{html.escape(parties_json_str)}</textarea>
             </div>
           </div>
           {action_buttons}
@@ -1709,7 +1886,10 @@ def _cert_panel(record: dict, host_name: str) -> str:
         for p in parties
         if isinstance(p, dict)
     )
-    verify_url = f"http://{host_name}/?verification_id={rec_id}"
+    public_tunnel = get_public_web_tunnel()
+    verify_url = f"{public_tunnel}/?verification_id={rec_id}"
+    qr_b64 = generate_qr_base64(verify_url)
+    qr_markup = f'<img src="data:image/png;base64,{qr_b64}" width="180" height="180" alt="Verification QR Code" style="display:block;margin:0 auto;border-radius:2px;">' if qr_b64 else '<canvas id="qrCanvas" width="200" height="200" aria-label="Verification QR code"></canvas>'
 
     return f"""
     <section class="panel cert rv">
@@ -1759,7 +1939,7 @@ def _cert_panel(record: dict, host_name: str) -> str:
             <div class="seal-center"><b>Sealed</b><span>Immutably on file</span></div>
           </div>
 
-          <div class="qrbox"><canvas id="qrCanvas" width="200" height="200" aria-label="Verification QR code"></canvas></div>
+          <div class="qrbox">{qr_markup}</div>
           <p class="qrurl">{html.escape(verify_url)}</p>
           <p class="qr-hint">Scan from any phone on the same office network: the page re-checks the signature locally, offline.</p>
         </div>
@@ -1770,9 +1950,11 @@ def _cert_panel(record: dict, host_name: str) -> str:
         </div>
       </div>
       <script>
-        setTimeout(function() {{
-          drawQRCode('qrCanvas', '{verify_url}');
-        }}, 100);
+        if (document.getElementById('qrCanvas')) {{
+          setTimeout(function() {{
+            drawQRCode('qrCanvas', '{verify_url}');
+          }}, 100);
+        }}
       </script>
     </section>
     """
@@ -1837,10 +2019,10 @@ def render_page(
         head = f"""
         <div class="console-top">
           <div class="console-head rv">
-            <h1>Verification <em>Console</em></h1>
+            <h1 data-i18n="console_h1">Verification <em>Console</em></h1>
             {_badge_markup(status)}
           </div>
-          <p class="sub rv">Record {html.escape(rec_id)}</p>
+          <p class="sub rv"><span data-i18n="lbl_record">Record</span> {html.escape(rec_id)}</p>
           {_stepper_markup(status)}
           {_banner_markup(message, blocked=("Approval refused" in (message or "")))}
           {timing_info}
@@ -1922,7 +2104,7 @@ def render_page(
 
 
 def render_verification_view(record: dict, sig_valid: bool) -> bytes:
-    """Renders the standalone public verification page (MUHAR register theme).
+    """Renders the standalone public verification page (OneBhoomi register theme).
 
     This is the page a phone lands on after scanning the certificate QR:
     it recomputes the signature check server-side and stamps the verdict.
@@ -1957,10 +2139,10 @@ def render_verification_view(record: dict, sig_valid: bool) -> bytes:
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
-      <title>MUHAR — Record Verification</title>
+      <title>OneBhoomi — Record Verification</title>
       <link rel="preconnect" href="https://fonts.googleapis.com">
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-      <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Archivo:wght@400;500;600;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+      <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Archivo:wght@400;500;600;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Noto+Sans+Telugu:wght@400;500;600;700&family=Noto+Sans+Kannada:wght@400;500;600;700&family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap" rel="stylesheet">
       <style>
         :root{{
           --paper:#F6F0E1; --paper-deep:#EFE6D0; --ink:#221D17; --ink-soft:#5A5142;
@@ -2077,10 +2259,26 @@ def render_verification_view(record: dict, sig_valid: bool) -> bytes:
     <header>
       <div class="reg-bar">
         <a class="brand" href="/">
-          <b>MUHAR</b>
-          <span>मुहर &nbsp;·&nbsp; public verification</span>
+          <b>OneBhoomi</b>
+          <span>वनभूमि &nbsp;·&nbsp; public verification</span>
         </a>
-        <span class="reg-no">RECORD NO. {html.escape(rec_id[:8].upper())}</span>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="lang-picker" title="Change Language">
+            <svg class="lang-svg" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;stroke:var(--stamp);fill:none;flex-shrink:0;display:inline-block;vertical-align:middle;">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="2" y1="12" x2="22" y2="12"></line>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+        </svg>
+            <select id="langSelect" class="lang-dropdown" aria-label="Select Language">
+              <option value="en" selected>English</option>
+              <option value="hi">हिंदी (Hindi)</option>
+              <option value="te">తెలుగు (Telugu)</option>
+              <option value="kn">ಕನ್ನಡ (Kannada)</option>
+              <option value="ta">தமிழ் (Tamil)</option>
+            </select>
+          </div>
+          <span class="reg-no">RECORD NO. {html.escape(rec_id[:8].upper())}</span>
+        </div>
       </div>
     </header>
 
@@ -2118,7 +2316,7 @@ def render_verification_view(record: dict, sig_valid: bool) -> bytes:
 
     <footer>
       <div class="foot-note">
-        <span>MUHAR · Offline Registry</span>
+        <span>OneBhoomi · Offline Registry</span>
         <span>Signature checked on this device's request, no cloud involved</span>
         <span><a class="btn" href="/">Registry Office</a></span>
       </div>
@@ -2245,9 +2443,9 @@ class LandExtractorHandler(BaseHTTPRequestHandler):
             self.wfile.write(page)
             return
 
-        # Public Landing Page (MUHAR Design System)
+        # Public Landing Page (OneBhoomi Design System)
         if parsed.path in {"/", "/index.html"}:
-            landing_file = Path(__file__).parent / "01-muhar-final.html"
+            landing_file = Path(__file__).parent / "01-onebhoomi-final.html"
             if landing_file.exists():
                 content = landing_file.read_bytes()
                 self.send_response(HTTPStatus.OK)
@@ -2366,101 +2564,113 @@ class LandExtractorHandler(BaseHTTPRequestHandler):
                 self.send_error(HTTPStatus.NOT_FOUND, "Verification record not found")
                 return
 
-            if record.get("status") == "APPROVED":
-                self.send_error(
-                    HTTPStatus.BAD_REQUEST,
-                    "Immutable approved records cannot be modified.",
-                )
-                return
+            current_status = record.get("status")
 
-            # Apply clerk corrections
-            payload = record.get("document_payload", {})
+            # 1. Postback on an already APPROVED record
+            if current_status == "APPROVED":
+                if action == "reject":
+                    if not rejection_reason.strip():
+                        message = "Rejection refused: a rejection reason is required to revoke an approved record."
+                    else:
+                        record["status"] = "REJECTED"
+                        record["rejection_reason"] = rejection_reason.strip()
+                        record["rejected_at"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+                        # We leave document_payload untouched to preserve historical audit integrity
+                        verification_service.save_record(record)
+                        message = "Approved certification was revoked and the record marked as REJECTED."
+                elif action == "approve":
+                    message = "Document is already approved and cryptographically sealed."
+                elif action == "correct":
+                    message = "Cannot modify facts: This document is already approved and sealed."
 
-            if "document_type" in form_fields:
-                payload["document_type"] = form_fields["document_type"]
-            if "document_number" in form_fields:
-                payload["document_number"] = form_fields["document_number"]
-
-            payload.setdefault("property", {})
-            if "area" in form_fields:
-                payload["property"]["area"] = form_fields["area"]
-            if "survey_number" in form_fields:
-                payload["property"]["survey_number"] = form_fields["survey_number"]
-            if "sub_survey_number" in form_fields:
-                payload["property"]["sub_survey_number"] = form_fields["sub_survey_number"]
-            if "village" in form_fields:
-                payload["property"]["village"] = form_fields["village"]
-            if "mandal" in form_fields:
-                payload["property"]["mandal"] = form_fields["mandal"]
-            if "district" in form_fields:
-                payload["property"]["district"] = form_fields["district"]
-
-            payload.setdefault("stamp_information", {})
-            if "stamp_number" in form_fields:
-                payload["stamp_information"]["stamp_number"] = form_fields["stamp_number"]
-                payload["stamp_number"] = form_fields["stamp_number"]
-            if "stamp_value" in form_fields:
-                payload["stamp_information"]["stamp_value"] = form_fields["stamp_value"]
-                payload["stamp_value"] = form_fields["stamp_value"]
-            if "sold_to" in form_fields:
-                payload["stamp_information"]["sold_to"] = form_fields["sold_to"]
-
-            if "document_date" in form_fields:
-                payload["document_date"] = form_fields["document_date"]
-            if "execution_date" in form_fields:
-                payload["execution_date"] = form_fields["execution_date"]
-
-            if "parties_json" in form_fields:
-                try:
-                    payload["parties"] = json.loads(form_fields["parties_json"])
-                except Exception:
-                    pass
-
-            # Recompute automated validation checks
-            checks = verification_service.run_verification_checks(payload)
-            status = verification_service.calculate_overall_status(checks)
-
-            record["document_payload"] = payload
-            record["checks"] = checks
-            record["status"] = status
-
-            message = ""
-            if action == "approve":
-                has_critical_fail = any(
-                    c.get("status") == "FAIL" and c.get("severity") == "critical"
-                    for c in checks
-                )
-                if has_critical_fail:
-                    message = "Approval refused: critical automated checks failed."
-                    verification_service.save_record(record)
-                else:
-                    sig = verification_service.sign_document(payload)
-                    pub_key = verification_service.get_public_verification_key()
-
-                    record["status"] = "APPROVED"
-                    record["signature"] = sig
-                    record["public_key"] = pub_key
-                    record["approved_at"] = datetime.utcnow().strftime(
-                        "%Y-%m-%dT%H:%M:%SZ"
-                    )
-                    verification_service.save_record(record)
-                    message = "Document approved and signed successfully."
+            # 2. Rejection on a non-approved record (NEEDS_REVIEW, FAIL, or REJECTED)
             elif action == "reject":
                 if not rejection_reason.strip():
                     message = "Rejection failed: a rejection reason is required."
-                    record["status"] = verification_service.calculate_overall_status(checks)
-                    verification_service.save_record(record)
                 else:
                     record["status"] = "REJECTED"
-                    record["rejection_reason"] = rejection_reason
+                    record["rejection_reason"] = rejection_reason.strip()
                     record["rejected_at"] = datetime.utcnow().strftime(
                         "%Y-%m-%dT%H:%M:%SZ"
                     )
                     verification_service.save_record(record)
                     message = "Document was rejected by the officer."
-            elif action == "correct":
-                verification_service.save_record(record)
-                message = "Clerk review corrections saved successfully."
+
+            # 3. Clerk corrections or officer approval on a non-approved record
+            elif action in ("approve", "correct"):
+                payload = record.get("document_payload", {})
+
+                if "document_type" in form_fields:
+                    payload["document_type"] = form_fields["document_type"]
+                if "document_number" in form_fields:
+                    payload["document_number"] = form_fields["document_number"]
+
+                payload.setdefault("property", {})
+                if "area" in form_fields:
+                    payload["property"]["area"] = form_fields["area"]
+                if "survey_number" in form_fields:
+                    payload["property"]["survey_number"] = form_fields["survey_number"]
+                if "sub_survey_number" in form_fields:
+                    payload["property"]["sub_survey_number"] = form_fields["sub_survey_number"]
+                if "village" in form_fields:
+                    payload["property"]["village"] = form_fields["village"]
+                if "mandal" in form_fields:
+                    payload["property"]["mandal"] = form_fields["mandal"]
+                if "district" in form_fields:
+                    payload["property"]["district"] = form_fields["district"]
+
+                payload.setdefault("stamp_information", {})
+                if "stamp_number" in form_fields:
+                    payload["stamp_information"]["stamp_number"] = form_fields["stamp_number"]
+                    payload["stamp_number"] = form_fields["stamp_number"]
+                if "stamp_value" in form_fields:
+                    payload["stamp_information"]["stamp_value"] = form_fields["stamp_value"]
+                    payload["stamp_value"] = form_fields["stamp_value"]
+                if "sold_to" in form_fields:
+                    payload["stamp_information"]["sold_to"] = form_fields["sold_to"]
+
+                if "document_date" in form_fields:
+                    payload["document_date"] = form_fields["document_date"]
+                if "execution_date" in form_fields:
+                    payload["execution_date"] = form_fields["execution_date"]
+
+                if "parties_json" in form_fields:
+                    try:
+                        payload["parties"] = json.loads(form_fields["parties_json"])
+                    except Exception:
+                        pass
+
+                # Recompute automated validation checks
+                checks = verification_service.run_verification_checks(payload)
+                status = verification_service.calculate_overall_status(checks)
+
+                record["document_payload"] = payload
+                record["checks"] = checks
+                record["status"] = status
+
+                if action == "approve":
+                    has_critical_fail = any(
+                        c.get("status") == "FAIL" and c.get("severity") == "critical"
+                        for c in checks
+                    )
+                    if has_critical_fail:
+                        message = "Approval refused: critical automated checks failed."
+                        verification_service.save_record(record)
+                    else:
+                        sig = verification_service.sign_document(payload)
+                        pub_key = verification_service.get_public_verification_key()
+
+                        record["status"] = "APPROVED"
+                        record["signature"] = sig
+                        record["public_key"] = pub_key
+                        record["approved_at"] = datetime.utcnow().strftime(
+                            "%Y-%m-%dT%H:%M:%SZ"
+                        )
+                        verification_service.save_record(record)
+                        message = "Document approved and sealed successfully."
+                elif action == "correct":
+                    verification_service.save_record(record)
+                    message = "Clerk review corrections saved successfully."
 
             payload_str = json.dumps(record, indent=2, ensure_ascii=False)
             host_name = self.headers.get("Host", f"localhost:{self.server.server_address[1]}")
@@ -2689,11 +2899,11 @@ class LandExtractorHandler(BaseHTTPRequestHandler):
                 )
                 timing_info = f"""
                 <div class="docket rv in">
-                  <span><b>Mode</b> {mode_label}</span>
-                  <span><b>Hardware</b> {html.escape(str(gpu_name))}</span>
-                  <span><b>OCR</b> {ocr_time_ms:.2f} ms</span>
-                  <span><b>Transit</b> {network_time_ms:.2f} ms</span>
-                  <span><b>Total</b> {total_time_ms:.2f} ms</span>
+                  <span><b data-i18n="lbl_mode">Mode</b> {mode_label}</span>
+                  <span><b data-i18n="lbl_hardware">Hardware</b> {html.escape(str(gpu_name))}</span>
+                  <span><b data-i18n="lbl_ocr">OCR</b> {ocr_time_ms:.2f} ms</span>
+                  <span><b data-i18n="lbl_transit">Transit</b> {network_time_ms:.2f} ms</span>
+                  <span><b data-i18n="lbl_total">Total</b> {total_time_ms:.2f} ms</span>
                 </div>
                 """
             else:

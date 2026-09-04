@@ -115,24 +115,85 @@ def wait_for_server(timeout: float = 6.0) -> bool:
     return False
 
 
+DEFAULT_CHANNEL = "onebhoomi_ocr_tunnel"
+
+
+def fetch_url_from_channel(channel: str = DEFAULT_CHANNEL) -> str | None:
+    endpoint = f"https://ntfy.sh/{channel}/raw?poll=1"
+    print(f"📡 Querying sync channel: {endpoint}...")
+    try:
+        resp = requests.get(endpoint, timeout=8)
+        if resp.status_code == 200 and resp.text.strip():
+            # Get latest line
+            lines = [l.strip() for l in resp.text.strip().splitlines() if l.strip()]
+            for line in reversed(lines):
+                url = extract_url(line)
+                if url.startswith("http"):
+                    return url
+    except Exception as exc:
+        print(f"      ⚠️  Error contacting sync channel: {exc}")
+    return None
+
+
+def update_server_in_place(ocr_url: str) -> bool:
+    """Hot-updates running web_app.py without restart."""
+    try:
+        resp = requests.get(f"http://localhost:{PORT}/set_ocr_url", params={"url": ocr_url}, timeout=3)
+        if resp.status_code == 200:
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def main():
     print("=" * 60)
     print(" 🚀 Kaggle / Colab OCR URL Updater & Web App Manager")
     print("=" * 60)
 
-    # 1. Get URL from CLI argument or prompt
-    if len(sys.argv) > 1:
-        raw_input = " ".join(sys.argv[1:])
+    sync_mode = False
+    channel = DEFAULT_CHANNEL
+    target_arg = None
+
+    args = sys.argv[1:]
+    if "--sync" in args or "-s" in args:
+        sync_mode = True
+        # Check if channel name provided after --sync
+        for i, a in enumerate(args):
+            if a in ("--sync", "-s") and i + 1 < len(args) and not args[i + 1].startswith("-"):
+                channel = args[i + 1]
+    elif args and not args[0].startswith("-"):
+        target_arg = " ".join(args)
+
+    if sync_mode:
+        print(f"🔄 Headless Sync Mode: Fetching URL from '{channel}'...")
+        fetched = fetch_url_from_channel(channel)
+        if not fetched:
+            print(f"❌ Could not retrieve URL from channel https://ntfy.sh/{channel}")
+            print("   Make sure your Kaggle notebook has started (Cell 3).")
+            return 1
+        raw_input = fetched
+        print(f"   ✓ Received URL: {raw_input}")
+    elif target_arg:
+        raw_input = target_arg
     else:
         try:
-            raw_input = input("👉 Enter Kaggle/Colab Public OCR URL (e.g. https://xxxx.trycloudflare.com): ").strip()
+            print(f"Options:")
+            print(f" [1] Type or paste a Kaggle/Colab URL (e.g. https://xxxx.trycloudflare.com)")
+            print(f" [2] Type 's' or press ENTER to sync automatically from '{channel}'")
+            choice = input("\n👉 Enter URL (or 's' to auto-sync): ").strip()
+            if not choice or choice.lower() in ("s", "sync"):
+                fetched = fetch_url_from_channel(channel)
+                if not fetched:
+                    print(f"❌ Could not retrieve URL from channel https://ntfy.sh/{channel}")
+                    return 1
+                raw_input = fetched
+                print(f"   ✓ Received URL: {raw_input}")
+            else:
+                raw_input = choice
         except (KeyboardInterrupt, EOFError):
             print("\nCancelled.")
             return 1
-
-    if not raw_input:
-        print("❌ Error: No URL provided.")
-        return 1
 
     ocr_url = extract_url(raw_input)
     parsed = urlparse(ocr_url)
@@ -159,22 +220,28 @@ def main():
     print("      ✅ Saved successfully.")
 
     # 4. Refresh / Restart web_app.py
-    print("[4/4] Refreshing web_app.py...")
-    running_pids = get_running_server_pids()
-    if running_pids:
-        print(f"      Restarting running server process (PID: {running_pids})...")
-        stop_server()
+    print("[4/4] Updating web_app.py...")
+    # Try hot-update first (zero downtime)
+    hot_updated = update_server_in_place(ocr_url)
+    if hot_updated:
+        print("      ⚡ Live Hot-Update Successful! No restart needed.")
+        is_ready = True
     else:
-        print("      Starting web_app.py server...")
+        running_pids = get_running_server_pids()
+        if running_pids:
+            print(f"      Restarting running server process (PID: {running_pids})...")
+            stop_server()
+        else:
+            print("      Starting web_app.py server...")
 
-    start_server()
-    is_ready = wait_for_server(timeout=6.0)
+        start_server()
+        is_ready = wait_for_server(timeout=6.0)
 
     print("\n" + "=" * 60)
     if is_ready:
-        print(" ✅ SUCCESS: Server refreshed and active!")
+        print(" ✅ SUCCESS: Server synced and active with Remote GPU!")
     else:
-        print(" ⚠️  Server started, but local port verification timed out.")
+        print(" ⚠️  Server updated, but local port verification timed out.")
 
     print(f" • Local Web App:     http://localhost:{PORT}")
     print(f" • Active OCR Tunnel: {ocr_url}")
@@ -185,3 +252,4 @@ def main():
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
